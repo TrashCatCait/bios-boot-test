@@ -1,0 +1,6 @@
+BIOSBOOT=boot.bin
+
+ASM=nasm 
+ASMFLAGS=-fbin 
+
+ASMFILES=$(wildcard src/*.asm)

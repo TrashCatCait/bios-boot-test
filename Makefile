@@ -1,15 +1,15 @@
-TARGET=catboot
+include ./Makefile.var
 
 ASM=nasm 
 ASMFLAGS=-fbin 
 
 ASMFILES=$(wildcard src/*.asm)
 
-$(TARGET): $(BUILDDIR) $(ASMFILES)
-	$(ASM) $(ASMFLAGS) $(ASMFILES) -o $(TARGET)
+$(BIOSBOOT): $(BUILDDIR) $(ASMFILES)
+	$(ASM) $(ASMFLAGS) $(ASMFILES) -o $(BIOSBOOT)
 
 clean:
-	rm -rf $(TARGET) 
+	rm -rf $(BIOSBOOT) 
 
 .PHONY: clean
 
