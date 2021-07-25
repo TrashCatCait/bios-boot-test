@@ -1,43 +1,78 @@
-org 0x7C00 ;Load program here    
-bits 16 ;define 16 bit code
+[org 0x7c00]
+[bits 16]
+;Stage one jobs enable A20
+;load stage 2
+;get to 32 bit mode
+;check CPUID and Long mode
+;call stage 2 main function
 
-section .text: 
-    global _start: ;define _start global so the linker can see it and use it.
+STAGE2 equ 0x9000
 
 _start: ;start execution here 
+    mov [BOOT_DISK], dl
     mov bp, 0x7c00 
-    mov bp, sp ;set up stack base and pointer
+    mov sp, bp ;set up stack base and pointer
+        ;first thing we do is read our bootloaders second stage. this is because BIOS loads the bootdisk into the dl registor
+    call read_disk
+    call checkA20
+    cmp ax, 0
+    je _start.a20off
     
-    mov si, msg
-    call printr
-    jmp hltloop
-
+    .a20off:
+    call enableA20
+        
+    .a20on:
+    jmp toprotected
+    jmp $
 
 printr:
-    pusha
+    pusha 
     mov ah, 0x0e
-    
-    .str_loop:
-        lodsb ;load single byte from si into al
-        cmp al, 0x00
-        je printr.done ;if null term char found end
-        int 0x10 ;call interupt
-        jmp printr.str_loop ;loop to next char
 
-    .done:
-        popa
+    .real_loop:
+        lodsb
+        cmp al, 0x00
+        je .real_done
+        int 0x10
+        jmp .real_loop
+    .real_done:
+        popa 
         ret
 
-; This is where we land if an error occurs. We disable interupts, htl the processor then if a NMI interupt occurs a interupt we can't stop we go back to hltloop to ensure we don't continue execution
-hltloop:
-    cli
-    hlt
-    jmp hltloop
+%include './a20.asm'
+%include './stage1gdt.asm'
+%include './diskread.asm'
 
-;Data
-msg: db "Hello World!", 0x00
+diskerror: db "Err Disk", 0x00 
+
+a20error: db "Err A20", 0x00
+
+[bits 32]
+%include './cpuid.asm'
+%include './stage1print.asm'
+protectedmode:
+    mov ax, dataseg
+	mov ds, ax
+	mov ss, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
+    
+    mov ebp, 0x90000;New stack above video mem 
+    mov esp, ebp
+
+    mov edi, 0xb8000
+    mov eax, 0x1f201f20
+    mov ecx, 1000
+    rep stosd 
+    call checkcpuid
+    jmp 0x9000
+    hlt
+
+
+;data
+longerror: db "Err Long", 0x00
 
 times 510-($-$$) db 0x00
-
 
 db 0x55, 0xaa

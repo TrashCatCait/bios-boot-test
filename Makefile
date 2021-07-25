@@ -1,9 +1,9 @@
 include ./Makefile.var
 
 ASM=nasm 
-ASMFLAGS=-fbin 
-
+ASMFLAGS=-i./src/includes/ -fbin -w+all -w+error 
 ASMFILES=$(wildcard src/*.asm)
+
 
 $(BIOSBOOT): $(BUILDDIR) $(ASMFILES)
 	$(ASM) $(ASMFLAGS) $(ASMFILES) -o $(BIOSBOOT)
