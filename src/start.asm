@@ -25,30 +25,171 @@
 %define curshape 0x0107 ;Cursor shape
 %define cursormode 0x0103 ;cursor set mode
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;      Execution Start      ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-boot_start: ;technically unused but nice for my brain
-    ;clear interupts before we clear the segement registers
-    cli
+mbr_start:
+    cli 
+    ;Set up stack 
+    ;Stack technically will grow towards our mbr code.
+    ;This isn't an issue as we won't be pushing a lot to stack 
+    ;so we should never go that low
+    mov bp, 0x7c00
+    mov sp, bp
+    
+    ;Clear segement regs
+    xor ax, ax
+    mov ss, ax
+    mov es, ax
+    mov gs, ax
+    mov ds, ax
+    
+    push dx ;save dl
 
-    ;set up stack
-    mov bp, 0x7c00 ; stack grows downwards from here
-    mov sp, bp ; aka away from our mbr code 
+    ;copy code to 0x600
+    mov si, 0x7c00 ;Current MBR pos 
+    mov di, 0x0600 ;destination 
+    mov cx, 0x0200 ;copy 512bytes
+    cld ;clear direction grow upwards not downwards
+    rep movsb
+    
+    push ax ;CS = 0000
+    push mbr_main ;location to return to should be 0x0600 + however many bytes this uses
+    retf ;far return to set code segement and goto new code start 
 
-    xor ax,ax
-    mov ss,ax
-    mov es,ax
-    mov ds,ax
-    mov gs,ax
-
+mbr_main: 
     sti
-    mov [bootdrive], dl;save dl in here
-    add bp, 494 ;bp now points to last partition in table
-    call video_init
+    
+    pop dx 
+    mov [bootdrive],dl
+
+    call video_init 
     call clear_screen
-    jmp print_part_labels
-    jmp loop_end ;0xf0 -> stack
+    jmp print_pt      
+    jmp loop_end ;shouldn't ever land here but just in case 
+
+;
+;   Print Partition Table 
+;
+print_pt: 
+    mov bp, 0x600 + 494 ;Base pointer = new code start + partition 4 byte 0 offset
+    mov cx, 4 ;Number of times to loop = size of partition table 
+    xor bx,bx
+
+    partition_loop:
+        ;;Number six may seem random but is half of the string
+        ;;length we are printing the purpose of this is to center
+        mov dx, rows + (cols - 6) ;use values defined above to compute
+        add dh, cl ;Move down by the number of rows = to partition 
+        call cursor_pos
+        
+        mov si, partstr
+        ;Replace place holder char with digit char
+        mov byte[si + 10], cl
+        add byte[si + 10], 0x30
+        call print_str
+        
+        cmp byte[bp], 0x80
+        jne skip_active
+        mov ax, 0x0e2a ;print star char
+        int 0x10
+
+    skip_active:
+        sub bp, 16 ;next entry 
+        loop partition_loop
+
+    partition_done:
+        mov dx, 0x0518
+        call cursor_pos
+        mov si, options
+        call print_str
+setup_menu:
+    ;set up menu to position one
+    mov bl, 1
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;         Menu Loop         ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+menu_loop:
+    mov dx, rows + 6 + cols 
+    add dh, bl 
+    call cursor_pos
+    
+    mov ah, 0x00 
+    int 0x16
+
+    cmp al, 0x77
+    je moveup
+
+    cmp al, 0x73 
+    je movedown
+
+    cmp al, 0x0d
+    je boot
+
+jmp menu_loop
+
+;
+; read vbr and setup 
+;
+
+boot: 
+    mov [chosenpart], bl 
+
+disk_read: 
+    mov ah, 0x00
+    mov dl, [bootdrive]
+    int 0x13 ;reset the boot disk
+    clc
+    xor dx,dx
+
+    call cursor_pos
+    call clear_screen
+    
+    xor bx,bx 
+    mov bl, [chosenpart]
+    shl bl, 4 
+    mov bp, 0x600 + 430 
+    add bp, bx
+
+    mov ax, 0x0201 
+    mov bx, 0x8000
+    mov dl, [bootdrive]
+    mov dh, [bp+1]
+    mov cl, [bp+2]
+    mov ch, [bp+3]
+
+    int 0x13
+    
+    jc read_error
+    
+attempt_boot: 
+    mov si, booting
+    call print_str
+    jmp 0x0000:0x8000
+
+jmp loop_end
+
+
+read_error:
+    mov si, disk_error
+    call print_str
+    jmp loop_end
+
+;
+; Menu Controls 
+;
+
+movedown:
+    cmp bl, 0x04
+    je movedown.skip
+    inc bl
+    .skip:
+    jmp menu_loop
+
+moveup:
+    cmp bl, 0x01
+    je moveup.skip
+    dec bl 
+    .skip:
+    jmp menu_loop
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -96,150 +237,22 @@ cursor_pos:
     int 0x10 
     ret
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;         Print PT          ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-print_part_labels:
-    mov cx, 4 ;number of times to loop equals partition table entrys
-    xor bx,bx ;we want this to be 0
-    
-    partition_loop:
-        ;;Number six may seem random but is half of the string
-        ;;length we are printing the purpose of this is to center
-        mov dx, rows + (cols - 6) ;use values defined above to compute
-        add dh, cl ;Move down by the number of rows = to partition 
-        call cursor_pos
-        
-        mov si, partstr
-        ;Replace place holder char with digit char
-        mov byte[si + 10], cl
-        add byte[si + 10], 0x30
-        call print_str
-        
-        cmp byte[bp], 0x80
-        jne skip_active
-        mov ax, 0x0e2a ;print star char
-        int 0x10
-
-    skip_active:
-        sub bp, 16 ;next entry 
-        loop partition_loop
-
-    partition_done:
-        mov dx, 0x0518
-        call cursor_pos
-        mov si, options
-        call print_str
-setup_menu:
-    ;set up menu to position one
-    mov bl, 1
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;       MBR Routines        ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-main_menu:
-    mov dx, rows + 6 + cols
-    add dh, bl
-    call cursor_pos
-
-    mov ah, 0x00
-    int 0x16
-
-    cmp al, 0x77 
-    je moveup
-
-    cmp al, 0x73
-    je movedown
-    
-    cmp al, 0x0D
-    je boot 
-
-jmp main_menu
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;          MBR Boot         ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-boot:
-    mov [chosenpart], bl ;move the chosen partition into here
-
-    xor dx,dx 
-
-    call cursor_pos
-    call clear_screen
-
-    mov bp, 0x7c00 + 430
-    xor bx,bx ;make sure bh is zero
-    mov bl, [chosenpart] ;restore bl original value 
-    shl bl, 4 ;times partition by 16
-    add bp, bx ; then add it to bp
-
-
-
-; OKAY rant time this function disk_read annoyed me so much as it kept returning disk error
-; it returned invalid parameter and as far as I could see the values where as far 
-; as I know correct. However I eventually got frustraded wrote the MBR to a USB drive
-; and rebooted my computer to the MBR on the USB and it didn't display the error
-; instead went on to do jmp loop_end. So my first plan was to not implement LBA
-; disk reading until later. But I'm going to work on this now as to see if this method 
-; works on qemu emulator as I don't wish to reboot my PC every time to test.
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;         Disk Read         ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-disk_read:
-    mov ax, 0x0201 ;read 1 sector 
-    mov bx, 0x8000 
-    mov dl, [bootdrive] ;Saved disk id
-    mov dh, [bp+01] ;Drive head is stored here.
-    mov cl, [bp+02] ;Drive sector
-    mov ch, [bp+03] ;Drive cyliander 
-
-    int 0x13
-
-    jc read_error
-
-
-
-jmp loop_end
-
-read_error:
-    mov si, disk_error
-    call print_str
-    jmp loop_end
-
-movedown:
-    cmp bl, 0x01
-    je movedown.skip
-    dec bl
-    .skip:
-    jmp main_menu
-
-moveup:
-    cmp bl, 0x04
-    je moveup.skip
-    inc bl 
-    .skip:
-    jmp main_menu
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;      Data & strings       ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-chosenpart: db 0 
-bootdrive: db 0 
+;
+; DATA and padding
+;
+bootdrive: db 0
+chosenpart: db 0
 partstr: db "Partition *", 0x00 ;6
+options: db "w-up | s-down | space-shutdown", 0x00 ;15
 disk_error: db "Disk Err", 0x00 ;4  
 code_error: db "Invalid Partition", 0x00
-options: db "w-up | s-down | space-shutdown", 0x00 ;15
+booting: db "Booting...", 0x00
 
+times 440-($-$$) db 0x00 
 
-;Fill code segement of MBR with 0x00
-;440 is the end of the code segement  
-times 440 - ($ - $$) db 0x00 
-
-;pad NT disk signature and two padding bytes
 times 6 db 0x00
 
-;pad partition table
-times (4 * 16) db 0x00
+times 64 db 0x00
 
+db 0x55, 0xaa 
 
-db 0x55, 0xaa ;Magic bios boot number
