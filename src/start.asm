@@ -150,7 +150,7 @@ disk_read:
     add bp, bx
 
     mov ax, 0x0201 
-    mov bx, 0x8000
+    mov bx, 0x7c00
     mov dl, [bootdrive]
     mov dh, [bp+1]
     mov cl, [bp+2]
@@ -163,7 +163,7 @@ disk_read:
 attempt_boot: 
     mov si, booting
     call print_str
-    jmp 0x0000:0x8000
+    jmp 0000:0x7c00
 
 jmp loop_end
 
