@@ -45,7 +45,7 @@ Help with the project and code contributions are always welcome. Though I do hav
 
 If your code does have issues/isn't bug free and you don't know how to fix it. Feel free to still submit a request others including myself can potentially help solve the bug.
 
-For small changes pull requests are more than welcome but for larger changes to the code base I would prefer for you to file an issue to being with [MERGE REQUEST] in the title with a detailed description of what you code is. Why you think it should be changed and what exactly the changed code does. E.G. "[MERGE REQUEST] Code update to fix reading disk on certain BIOS"
+For small changes pull requests are more than welcome but for larger changes to the code base I would prefer for you to file an issue to being with [MERGE REQUEST] in the title with a detailed description of what you code is. Why you think it should be changed and what exactly the changed code does. E.G. "[MERGE REQUEST] Code update to fix program on old UEFI versions"
 
 
 # FAQ
@@ -55,5 +55,5 @@ ___
 
 # Branches
 
-- `Master` this branch is what I consider to be the upto date stable code and a good effort to make it bug free and working will always be taken. Along with giving me a clean empty branch to fall back on if I make a huge mistake on other branches.
-- `Unstable` like the name suggest this branch is where I push the most recent and unstable/untested code. There is less gurantees about this branch actually working but of course an effort will still be made to ensure it "works". But this branch will also reflect what I'm currently working on.
+- `Master` this branch is what I consider to be the up to date stable code and a good effort to make it bug free and working will always be taken. Along with giving me a clean empty branch to fall back on if I make a huge mistake on other branches.
+- `Unstable` like the name suggest this branch is where I push the most recent and unstable/untested code. There is less guarantees about this branch actually working but of course an effort will still be made to ensure it "works". But this branch will also reflect what I'm currently working on.
