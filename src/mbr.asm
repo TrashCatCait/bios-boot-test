@@ -27,12 +27,6 @@
 
 mbr_start:
     cli 
-    ;Set up stack 
-    ;Stack technically will grow towards our mbr code.
-    ;This isn't an issue as we won't be pushing a lot to stack 
-    ;so we should never go that low
-    mov bp, 0x7c00
-    mov sp, bp
     
     ;Clear segement regs
     xor ax, ax
@@ -40,8 +34,15 @@ mbr_start:
     mov es, ax
     mov gs, ax
     mov ds, ax
-    
+    mov fs, ax 
+    ;Set up stack 
+    ;Stack technically will grow towards our mbr code.
+    ;This isn't an issue as we won't be pushing a lot to stack 
+    ;so we should never go that low
+    mov sp, 0x7c00
+
     push dx ;save dl
+    
 
     ;copy code to 0x600
     mov si, 0x7c00 ;Current MBR pos 
@@ -50,9 +51,8 @@ mbr_start:
     cld ;clear direction grow upwards not downwards
     rep movsb
     
-    push ax ;CS = 0000
-    push mbr_main ;location to return to should be 0x0600 + however many bytes this uses
-    retf ;far return to set code segement and goto new code start 
+    jmp 0x600+skip ;location to return to should be 0x0600 + however many bytes this uses
+skip: equ ($-$$)
 
 mbr_main: 
     sti
@@ -137,34 +137,32 @@ disk_read:
     mov ah, 0x00
     mov dl, [bootdrive]
     int 0x13 ;reset the boot disk
-    clc
+    jc disk_read
     xor dx,dx
 
     call cursor_pos
     call clear_screen
-    
     xor bx,bx 
     mov bl, [chosenpart]
     shl bl, 4 
     mov bp, 0x600 + 430 
     add bp, bx
 
-    mov ax, 0x0201 
     mov bx, 0x7c00
+    mov es, bx 
+    xor bx,bx
     mov dl, [bootdrive]
     mov dh, [bp+1]
     mov cl, [bp+2]
     mov ch, [bp+3]
-
+    mov ax, 0x0201 
     int 0x13
-    
     jc read_error
     
-attempt_boot: 
-    mov si, booting
+attempt_boot:
+    mov si,booting
     call print_str
-    jmp 0000:0x7c00
-
+    jmp 0x7c00:0x0000
 jmp loop_end
 
 
@@ -253,6 +251,5 @@ times 440-($-$$) db 0x00
 times 6 db 0x00
 
 times 64 db 0x00
-
 db 0x55, 0xaa 
 
