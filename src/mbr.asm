@@ -8,9 +8,18 @@
 ;   6√a) if an error occurs while boot goto root 6√b ;
 ;   5√b) If read error occurs inform the user.       ;
 ;   6√b) and set a timer for restarting              ;
+;   This project is simply a chain loader it does    ;
+;   nothing to ensure A20, GDT or anything else is   ;
+;   set up it assumes the bootloader will do that    ;
+;   The purpose of this is to allow multiboot on MBR ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-[org 0x7c00]
 [bits 16]
+[org 0x7c00]
+
+
+; $$ - section start = org 0x7c00
+; $ - current pos
+; ($ - $$)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;        Definations        ;
@@ -43,7 +52,7 @@ mbr_start:
 
     push dx ;save dl
     
-
+ 
     ;copy code to 0x600
     mov si, 0x7c00 ;Current MBR pos 
     mov di, 0x0600 ;destination 
@@ -51,18 +60,21 @@ mbr_start:
     cld ;clear direction grow upwards not downwards
     rep movsb
     
-    jmp 0x600+skip ;location to return to should be 0x0600 + however many bytes this uses
-skip: equ ($-$$)
 
-mbr_main: 
+    ;;Jmp to 0x600+(mbr_main-0x7c00)
+    ;;Aka jump to mbr_code in the copied code
+    jmp 0x0000:0x0600+(mbr_main-$$)
+    
+
+mbr_main:
     sti
     
     pop dx 
     mov [bootdrive],dl
 
-    call video_init 
+    call video_init
     call clear_screen
-    jmp print_pt      
+    jmp print_pt    
     jmp loop_end ;shouldn't ever land here but just in case 
 
 ;
@@ -98,8 +110,8 @@ print_pt:
     partition_done:
         mov dx, 0x0518
         call cursor_pos
-        mov si, options
-        call print_str
+        ;mov si, options
+        ;call print_str
 setup_menu:
     ;set up menu to position one
     mov bl, 1
@@ -108,6 +120,7 @@ setup_menu:
 ;         Menu Loop         ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 menu_loop:
+    xor dx,dx 
     mov dx, rows + 6 + cols 
     add dh, bl 
     call cursor_pos
@@ -132,25 +145,68 @@ jmp menu_loop
 
 boot: 
     mov [chosenpart], bl 
-
-disk_read: 
-    mov ah, 0x00
-    mov dl, [bootdrive]
-    int 0x13 ;reset the boot disk
-    jc disk_read
+    
     xor dx,dx
-
     call cursor_pos
     call clear_screen
+
+check_ext:
+    mov ah, 0x41 ;Function number for check extentions
+    mov bx, 0x55aa ;Should be reversed if extentions exist
+    mov dl, [bootdrive]
+    int 0x13
+
+    cmp bx, 0xaa55 ;If reversed continue else jump
+    jne disk_read_no_ext
+    jc disk_read_no_ext ;technically checking bx should cover this but just in case
+    
+    mov dl,[bootdrive]
+    shr dl,4 
+    add dl,48 
+    mov al,dl
+    mov ah, 0x0e
+    int 0x10
+    jmp disk_read_ext
+
+disk_reset:
+    mov ah, 0x00
+    mov dl, [bootdrive]
+    int 0x13
+    jc disk_reset
+    
+    ;Basically set up BP to point at our chosen partition
+    ;Put stuff in for reading
     xor bx,bx 
     mov bl, [chosenpart]
     shl bl, 4 
     mov bp, 0x600 + 430 
     add bp, bx
 
+    ret 
+
+
+disk_read_ext:
+    call disk_reset
+
+    mov dl, [bootdrive]
+    mov ah, 0x42
+
+    push dword 0x00 ;push dword into zero 
+    push dword [bp+0x08] ;Starting absolute sector read from PT table
+    push word 0x00 ;Segement and offset 
+    push word 0x7c00 ;read into 0x0000:0x7c00 
+    push word 0x0001 ;Sectors to read
+    push word 0x0010 ;DAP size 
+    
+    mov si, sp ;ds:si must point to DAP ds = 0 from program start and dap is on top of the stack
+    int 0x13
+    jc read_error
+    jmp check_vbr
+
+disk_read_no_ext:
+    call disk_reset
+
     mov bx, 0x7c00
-    mov es, bx 
-    xor bx,bx
     mov dl, [bootdrive]
     mov dh, [bp+1]
     mov cl, [bp+2]
@@ -159,15 +215,34 @@ disk_read:
     int 0x13
     jc read_error
     
+check_vbr:
+    cmp word [0x7c00], 0x0000 
+    je invalid_part
+    cmp word [0x7dfe], 0xaa55
+    jne invalid_part
+
 attempt_boot:
-    mov si,booting
-    call print_str
-    jmp 0x7c00:0x0000
+    ;Removed this as it's not on screen long enough to see as far as I can tell
+    ;It's not really on screen long enough to see.
+    ;mov si,0x0600+(booting-$$)
+    ;call print_str
+    xor dx,dx 
+    mov dl,[bootdrive]
+    ;jmp 0x000:0x7c00
 jmp loop_end
+
+invalid_part:
+    ;Not 100% sure whats going on but I think I understand. This didn't print after I read the code to 0x7c00
+    ;I think it must have something to do with org 0x7c00 so the label code_error is like for example at position 0x7c*
+    ;Not referencing the new location of 0x06**
+    mov si, 0x0600+(code_error-$$)
+    call print_str
+    jmp loop_end
 
 
 read_error:
-    mov si, disk_error
+    ;Not sure this has to be position independant but just in case
+    mov si, 0x600+(disk_error-$$)
     call print_str
     jmp loop_end
 
@@ -241,15 +316,16 @@ cursor_pos:
 bootdrive: db 0
 chosenpart: db 0
 partstr: db "Partition *", 0x00 ;6
-options: db "w-up | s-down | space-shutdown", 0x00 ;15
-disk_error: db "Disk Err", 0x00 ;4  
-code_error: db "Invalid Partition", 0x00
-booting: db "Booting...", 0x00
+;options: db "w-up | s-down | enter-select", 0x00 ;14
+disk_error: db "Disk Err", 0x00 ;4 
+;;Shortened to part to save bytes 
+code_error: db "Invalid Part", 0x00
 
 times 440-($-$$) db 0x00 
 
 times 6 db 0x00
 
 times 64 db 0x00
+
 db 0x55, 0xaa 
 

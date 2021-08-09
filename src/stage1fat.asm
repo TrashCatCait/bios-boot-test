@@ -5,7 +5,7 @@
 ;   3) clean up                                      ;
 ;   size 420 bytes to achieve this in.               ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-[org 0x7e00]
+[org 0x7c00]
 [bits 16]
 
 fake_start:
@@ -20,8 +20,6 @@ real_start:
     ;Stack technically will grow towards our mbr code.
     ;This isn't an issue as we won't be pushing a lot to stack 
     ;so we should never go that low
-    mov bp, 0x7e00
-    mov sp, bp
     
     ;Clear segement regs
     xor ax, ax
@@ -29,12 +27,20 @@ real_start:
     mov es, ax
     mov gs, ax
     mov ds, ax
-    
+
+    mov bp, 0x7c00
+    mov sp, bp
+       
     push dx ;save dl
     
     sti
 
-    mov ax,0x0e73
+    mov ah,0x0e
+    pop dx
+    shr dl, 4 
+    add dl,48
+    mov al,dl 
+
     int 0x10
     
     jmp $
