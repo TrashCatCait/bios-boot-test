@@ -9,7 +9,7 @@ RAWFILES=$(patsubst src/%.asm, %.bin, $(ASMFILES))
 all: $(RAWFILES)
 
 %.bin: ./src/%.asm
-	$(ASM) $(ASMFLAGS) $^ -o $@
+	$(ASM) $(ASMFLAGS) -I./src $^ -o $@
 
 clean:
 	rm -rf *.bin 

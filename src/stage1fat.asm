@@ -17,9 +17,6 @@ fake_start:
 real_start:
     cli 
     ;Set up stack 
-    ;Stack technically will grow towards our mbr code.
-    ;This isn't an issue as we won't be pushing a lot to stack 
-    ;so we should never go that low
     
     ;Clear segement regs
     xor ax, ax
@@ -34,17 +31,57 @@ real_start:
     push dx ;save dl
     
     sti
-
-    mov ah,0x0e
-    pop dx
-    shr dl, 4 
-    add dl,48
-    mov al,dl 
-
-    int 0x10
     
+    call enableA20
+    jmp load_protected
     jmp $
+    
 
-    times 510-($-$$) db 0x00
+print: 
+    mov ah,0x0e
+
+    .loop:
+	lodsb
+	cmp al, 0x00 
+	je print.done 
+	int 0x10 
+	jmp print.loop
+
+    .done:
+	ret
+
+%include './inc/a20.asm'
+%include './inc/gdt32.asm'
+
+[bits 32]
+
+protected:
+    mov ax, data32
+    mov ds, ax
+    mov ss, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    mov ebp, 0x90000 ;stack here so it grows away from VGA video memory 
+    mov esp, ebp
+    
+    mov edi, 0xb8000
+    mov eax, 0x2f202f20
+    mov ecx, 1000
+    rep stosd
+
+    jmp hltloop
+
+
+hltloop:
+    hlt
+    jmp hltloop
+
+;
+;Data
+;
+a20error: db "a20 Err", 0x00 
+
 
 db 0x55, 0xaa

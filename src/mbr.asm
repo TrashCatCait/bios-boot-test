@@ -69,8 +69,6 @@ mbr_start:
 mbr_main:
     sti
     
-    pop dx 
-    mov [bootdrive],dl
 
     call video_init
     call clear_screen
@@ -144,51 +142,51 @@ jmp menu_loop
 ;
 
 boot: 
-    mov [chosenpart], bl 
-    
+    push bx ;save BL stack atm bl ontop of dl  
     xor dx,dx
     call cursor_pos
     call clear_screen
 
+    ;Basically set up BP to point at our chosen partition
+    ;Put stuff in for reading
+    pop bx
+    xor bh,bh  
+    shl bl, 4 
+    mov bp, 0x600 + 430 
+    add bp, bx
+    
+    ;[bp] should = offset 0 of pt table 
+    ;[bp] set to disk to save it 
+    pop dx
+    mov [bp], dl
+
+
 check_ext:
     mov ah, 0x41 ;Function number for check extentions
     mov bx, 0x55aa ;Should be reversed if extentions exist
-    mov dl, [bootdrive]
+    mov dl, [bp]
     int 0x13
 
     cmp bx, 0xaa55 ;If reversed continue else jump
     jne disk_read_no_ext
     jc disk_read_no_ext ;technically checking bx should cover this but just in case
     
-    mov dl,[bootdrive]
-    shr dl,4 
-    add dl,48 
-    mov al,dl
-    mov ah, 0x0e
-    int 0x10
+    mov dl,[bp]
     jmp disk_read_ext
 
 disk_reset:
     mov ah, 0x00
-    mov dl, [bootdrive]
+    mov dl, [bp]
     int 0x13
     jc disk_reset
     
-    ;Basically set up BP to point at our chosen partition
-    ;Put stuff in for reading
-    xor bx,bx 
-    mov bl, [chosenpart]
-    shl bl, 4 
-    mov bp, 0x600 + 430 
-    add bp, bx
-
     ret 
 
 
 disk_read_ext:
     call disk_reset
 
-    mov dl, [bootdrive]
+    mov dl, [bp]
     mov ah, 0x42
 
     push dword 0x00 ;push dword into zero 
@@ -207,7 +205,7 @@ disk_read_no_ext:
     call disk_reset
 
     mov bx, 0x7c00
-    mov dl, [bootdrive]
+    mov dl, [bp]
     mov dh, [bp+1]
     mov cl, [bp+2]
     mov ch, [bp+3]
@@ -216,9 +214,9 @@ disk_read_no_ext:
     jc read_error
     
 check_vbr:
-    cmp word [0x7c00], 0x0000 
+    cmp word [es:0x7c00], 0x0000 
     je invalid_part
-    cmp word [0x7dfe], 0xaa55
+    cmp word [es:0x7dfe], 0xaa55
     jne invalid_part
 
 attempt_boot:
@@ -227,8 +225,8 @@ attempt_boot:
     ;mov si,0x0600+(booting-$$)
     ;call print_str
     xor dx,dx 
-    mov dl,[bootdrive]
-    ;jmp 0x000:0x7c00
+    mov dl,[bp]
+    jmp 0x0000:0x7c00
 jmp loop_end
 
 invalid_part:
@@ -312,9 +310,9 @@ cursor_pos:
 
 ;
 ; DATA and padding
-;
-bootdrive: db 0
-chosenpart: db 0
+; swapped using boot drive to use stack instead along with chose part
+;bootdrive: db 0
+;chosenpart: db 0
 partstr: db "Partition *", 0x00 ;6
 ;options: db "w-up | s-down | enter-select", 0x00 ;14
 disk_error: db "Disk Err", 0x00 ;4 
