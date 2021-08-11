@@ -39,6 +39,6 @@ load_protected:
     mov eax, cr0 ;move cr0 into eax 
     or eax, 1 ;set bit one 
     mov cr0, eax ;put it back
-    jmp code32:protected
+    jmp code32:protected_start
 
 

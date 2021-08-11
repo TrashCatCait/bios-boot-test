@@ -188,7 +188,7 @@ disk_read_ext:
 
     mov dl, [bp]
     mov ah, 0x42
-
+    
     push dword 0x00 ;push dword into zero 
     push dword [bp+0x08] ;Starting absolute sector read from PT table
     push word 0x00 ;Segement and offset 
@@ -203,7 +203,7 @@ disk_read_ext:
 
 disk_read_no_ext:
     call disk_reset
-
+    
     mov bx, 0x7c00
     mov dl, [bp]
     mov dh, [bp+1]
@@ -227,7 +227,6 @@ attempt_boot:
     xor dx,dx 
     mov dl,[bp]
     jmp 0x0000:0x7c00
-jmp loop_end
 
 invalid_part:
     ;Not 100% sure whats going on but I think I understand. This didn't print after I read the code to 0x7c00
