@@ -142,14 +142,14 @@ jmp menu_loop
 ;
 
 boot: 
-    push bx ;save BL stack atm bl ontop of dl  
+    mov [0x600+chosenpart-$$],bl
     xor dx,dx
     call cursor_pos
     call clear_screen
 
     ;Basically set up BP to point at our chosen partition
     ;Put stuff in for reading
-    pop bx
+    mov bl, [0x600+chosenpart-$$]
     xor bh,bh  
     shl bl, 4 
     mov bp, 0x600 + 430 
@@ -198,6 +198,9 @@ disk_read_ext:
     
     mov si, sp ;ds:si must point to DAP ds = 0 from program start and dap is on top of the stack
     int 0x13
+    
+    add sp,0x10
+
     jc read_error
     jmp check_vbr
 
@@ -225,6 +228,8 @@ attempt_boot:
     ;mov si,0x0600+(booting-$$)
     ;call print_str
     xor dx,dx 
+    xor bx,bx
+    mov bx,[bp+0x08]
     mov dl,[bp]
     jmp 0x0000:0x7c00
 
@@ -311,7 +316,7 @@ cursor_pos:
 ; DATA and padding
 ; swapped using boot drive to use stack instead along with chose part
 ;bootdrive: db 0
-;chosenpart: db 0
+chosenpart: db 0
 partstr: db "Partition *", 0x00 ;6
 ;options: db "w-up | s-down | enter-select", 0x00 ;14
 disk_error: db "Disk Err", 0x00 ;4 

@@ -167,4 +167,5 @@ a20error: db "Error Enabling A20 Line", 0x00
 longerror: db "No Long mode support detected", 0x00 
 cpuiderr: db "Error checking CPU", 0x00
 
-db 0x55, 0xaa
+times 1022-($-$$) db 0x00
+SIGNATURE: db 0x55, 0xaa ;This is here as sort of signature

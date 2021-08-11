@@ -44,7 +44,7 @@ fake_start:
 
 real_start:
     cli 
-    
+     
     ;Clear segement regs
     xor eax, eax
     mov ss, ax
@@ -57,7 +57,9 @@ real_start:
     mov sp, bp
        
     sti
-    
+    ;;currently we assume the MBR gives us the partition offset in bx
+    ;;and the bios disk id in dl
+    mov [partition_offset], bx ;Store partition offset for later use.
     mov [DriveNum], dl ;Save the value of dl
 
     ;
@@ -88,15 +90,21 @@ real_start:
     call lba_read
     
     mov di, 0x0800
+ 
+    ;We loop here to load the next file if the last one is incorrect
+    next_entry: 
     mov ax, word[di + 0x003a]
     
     ;Load stage2 here
-    
     call calc_lba
-    mov cx, 0x0002
     mov bx, 0x8000
+    mov cx, 0x0002
     call lba_read
-    
+    cmp word[0x83fe], 0xaa55
+    jne not_valid 
+    cmp word[0x8000], 0x0000
+    je stage2err
+
     ;Jump to stage 2
     jmp 0x0000:0x8000
 
@@ -104,10 +112,17 @@ real_start:
     jmp $
 
 ;
+;
+;
+not_valid:
+    add di, 0x20
+    jmp next_entry
+    
+;
 ;  LBA READ DISK
 ;
 disk_reset:
-    mov ah, 0x00
+    xor ax,ax
     mov dl, [DriveNum]
     int 0x13
     jc disk_reset
@@ -141,17 +156,38 @@ lba_read:
 
     ret
 
-
-disk_error:
-    mov ax, 0x0e77
-    int 0x10
-    jmp $
-
 ;
 ; outdated but may be needed 
-;
+; Currently unworking reads wrong disk sectors I think
 chs_read:
+    pusha 
+    call disk_reset
+    popa
 
+    call lba_to_chs 
+    mov ah, 0x02 ;BIOS READ int 0x13
+    mov al, cl ;sectors to read 
+    mov ch, byte[abs_cyli] ;Move the cylinder count into ch
+    mov cl, byte[abs_sect] 
+    mov dh, byte[abs_head]
+    mov dl, byte[DriveNum]
+    int 0x13
+    jc disk_error 
+    ret
+
+;
+; Errors
+;
+stage2err:
+    mov si, stage2_fail 
+    call print_str
+    jmp $
+
+
+disk_error:
+    mov si, disk_fail
+    call print_str
+    jmp $
 
 ;;
 ;  BIOS Print Function
@@ -179,7 +215,7 @@ print_str:
 	mov cl, byte[Sectors_Per_Cluster] ;mov sectors per cluster to cl
 	mul cx ;ax now equal previous value * cx
 	add eax, dword[FATDATA] ;ax now equals previous + FATDATA sector
-	add ax, 0x0800
+	add ax, word[partition_offset]
 	ret
 
     ;;If extentions aren't supported we need to calculate this
@@ -189,7 +225,14 @@ print_str:
     ;   head = temp / sectors_per_track
     ;   sector = temp % sectors_per_track + 1
     lba_to_chs:
-	
+	xor dx, dx
+	div word [Sectors_Per_Track] ; calculate absolute sector
+	inc dl 
+	mov byte [abs_sect], dl
+	xor dx,dx
+	div word [Sectors_Per_Head] 
+	mov [abs_head], dl
+	mov [abs_cyli], al
 	ret
 
 ;;
@@ -197,12 +240,15 @@ print_str:
 ;;
 
 FATDATA dd 0x0000
-
-
+partition_offset dw 0x0000 
+abs_sect db 0x00
+abs_cyli db 0x00
+abs_head db 0x00
 ;;
 ; strings 
 ;;
-stage2_failure: db "Loading Stage 2 Failed", 0x00
+disk_fail: db "Read Error", 0x00
+stage2_fail: db "Stage 2 Empty Code", 0x00
 
 
 times 510-($-$$) db 0 
