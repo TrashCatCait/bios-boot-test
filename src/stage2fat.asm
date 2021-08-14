@@ -72,9 +72,6 @@ long_start:
     mov ecx, 500                  ; Set the C-register to 500.
     rep stosq                     ; Clear the screen.
     
-    mov rsi, longinit
-    call print_lm
-    
     mov rdi, 0x1000
     xor rax, rax 
     mov cx, 0x01 
@@ -90,24 +87,60 @@ long_start:
     jz no_err
 
     err:
-    mov edi, 0xB8000              ; Set the destination index to 0xB8000.
-    mov rax, 0x1F201F201F201F20   ; Set the A-register to 0x1F201F201F201F20.
-    mov ecx, 500                  ; Set the C-register to 500.
-    rep stosq                     ; Clear the screen.
     jmp hltloop 
     no_err:
 
-    mov edi, 0xB8000              ; Set the destination index to 0xB8000.
-    mov rax, 0x1F201F201F201F20   ; Set the A-register to 0x1F201F201F201F20.
-    mov ecx, 500                  ; Set the C-register to 500.
-    rep stosq	; Clear the screen.	
-
-    mov rsi,readdone
+    ;Print Register Label
+    mov rsi, reg1
+    mov rbx, 0xb8000
     call print_lm
+
+    ;Print Register Value
+    xor rax,rax 
+    mov ax, word[0x1ffe]
+    mov rdi,rax
+
+    mov rsi,0xb8008
+    call print_reg
+    
+    ;Print Register Label
+    mov rbx, rsi 
+    add rbx, 2
+    mov rsi, reg2
+    
+    call print_lm
+    
+    mov rsi,rbx
+    xor rbx,rbx
+    mov bx, word[0x07fe]
+    mov rdi, rbx
+
+    call print_reg
+
     jmp hltloop
 
 %include './inc/print_64.asm'
 %include './inc/ata_read64.asm'
+
+print_reg:
+    
+    xor rax,rax
+    mov ecx,16
+    lea rdx, [hex_ascii]
+
+    .loop:
+	rol rdi, 4 
+	mov al, dil
+	and al, 0x0f
+	mov al, byte[hex_ascii+rax]
+	
+	mov [rsi], al
+	add rsi, 2 
+	dec ecx
+	jnz .loop
+
+    .exit:
+	ret
 
 hltloop:
     hlt
@@ -117,10 +150,13 @@ hltloop:
 ;
 ;Data
 ;
+reg1: db "RAX:", 0x00 
+reg2: db "RBX:", 0x00
 readdone: db "Reading finished no error bits set", 0x00
 a20error: db "Error Enabling A20 Line", 0x00 
 longerror: db "No Long mode support detected", 0x00 
 cpuiderr: db "Error checking CPU", 0x00
+hex_ascii: db "0123456789abcdef", 0x00
 
 times 1022-($-$$) db 0x00
 SIGNATURE: db 0x55, 0xaa ;This is here as sort of signature

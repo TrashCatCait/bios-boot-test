@@ -4,8 +4,6 @@
 ;	returns nothing
 ;;
 print_lm:
-    push rbx
-    mov ebx, 0xb8000
 	
     .loop:
         lodsb
@@ -23,7 +21,6 @@ print_lm:
 	jmp print_lm.loop
 
     .done:
-	pop rbx
 	ret
 
 ;
