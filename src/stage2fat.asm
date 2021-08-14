@@ -28,22 +28,9 @@ stage2_start:
     jmp load_protected
     jmp $
     
-
-print: 
-    mov ah,0x0e
-
-    .loop:
-	lodsb
-	cmp al, 0x00 
-	je print.done 
-	int 0x10 
-	jmp print.loop
-
-    .done:
-	ret
-
 %include './inc/a20.asm'
 %include './inc/gdt32.asm'
+%include './inc/print.asm'
 
 [bits 32]
 
@@ -66,28 +53,7 @@ protected_start:
 %include './inc/cpuid.asm'
 %include './inc/gdt64.asm'
 %include './inc/paging.asm'
-
-print_pm:
-    pushad
-    mov ebx, 0xb8000
-
-    .loop:
-	lodsb
-	mov ah, 0x3f
-
-	cmp al, 0 
-	je print_pm.exit
-	
-	mov [ebx],ax
-
-
-	add ebx, 2 ;next char index
-
-	jmp print_pm.loop
-    
-    .exit:
-	popad
-	ret
+%include './inc/print_32.asm'
 
 [bits 64]
 long_start:
@@ -108,51 +74,40 @@ long_start:
     
     mov rsi, longinit
     call print_lm
+    
+    mov rdi, 0x1000
+    xor rax, rax 
+    mov cx, 0x01 
+    mov bl, 00000000b
 
+    call ata_read_lba
+    
+    mov dx, 0x01f1
+    in ax, dx
+    
+    ;;Tried this and the error bit doesn't seem to be set.
+    test ax, 0
+    jz no_err
+
+    err:
+    mov edi, 0xB8000              ; Set the destination index to 0xB8000.
+    mov rax, 0x1F201F201F201F20   ; Set the A-register to 0x1F201F201F201F20.
+    mov ecx, 500                  ; Set the C-register to 500.
+    rep stosq                     ; Clear the screen.
+    jmp hltloop 
+    no_err:
+
+    mov edi, 0xB8000              ; Set the destination index to 0xB8000.
+    mov rax, 0x1F201F201F201F20   ; Set the A-register to 0x1F201F201F201F20.
+    mov ecx, 500                  ; Set the C-register to 500.
+    rep stosq	; Clear the screen.	
+
+    mov rsi,readdone
+    call print_lm
     jmp hltloop
 
-print_lm:
-    push rbx
-    mov ebx, 0xb8000
-	
-    .loop:
-        lodsb
-	mov ah, 0x1f 
-
-	cmp al, 0x00
-	je print_lm.done
-
-	mov [ebx], ax
-
-	add ebx, 2
-	
-	call set_cur
-
-	jmp print_lm.loop
-
-    .done:
-	pop rbx
-	ret
-
-set_cur:
-    ;mov cursor
-    mov dx, 0x03d4
-    mov al, 0x0f
-    out dx, al
-
-    inc dl
-    mov al, bl
-    out dx, al
-    
-    dec dl
-    mov al, 0x0e
-    out dx, al
-    
-    inc dl
-    mov al, bh
-    out dx, al
-    ret
-
+%include './inc/print_64.asm'
+%include './inc/ata_read64.asm'
 
 hltloop:
     hlt
@@ -162,7 +117,7 @@ hltloop:
 ;
 ;Data
 ;
-longinit: db "Long Mode Started... Next goal load a kernel", 0x00
+readdone: db "Reading finished no error bits set", 0x00
 a20error: db "Error Enabling A20 Line", 0x00 
 longerror: db "No Long mode support detected", 0x00 
 cpuiderr: db "Error checking CPU", 0x00
