@@ -57,3 +57,14 @@ ___
 
 - `Master` this branch is what I consider to be the up to date stable code and a good effort to make it bug free and working will always be taken. Along with giving me a clean empty branch to fall back on if I make a huge mistake on other branches.
 - `Unstable` like the name suggest this branch is where I push the most recent and unstable/untested code. There is less guarantees about this branch actually working but of course an effort will still be made to ensure it "works". But this branch will also reflect what I'm currently working on.
+
+___
+
+# What's supported
+
+- [x] Booting from the master SATA drive on first ATA bus located at legacy port 0x01f0
+- [ ] Booting from the non master/master drives on any other ATA bus 
+- [ ] USB booting (as stage2 bootloader can't read from USB currently)
+- [ ] CD-ROM (Untested but I assume this doesn't work)
+- [ ] Floopy drive(Untested I assume it doesn't work)
+- [ ] m.2 SSD (Untested I assume this doesn't work. Though I think they also use ATA buses iinm)

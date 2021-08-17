@@ -98,9 +98,9 @@ real_start:
     ;Load stage2 here
     call calc_lba
     mov bx, 0x8000
-    mov cx, 0x0002
+    mov cx, 0x0003
     call lba_read
-    cmp word[0x83fe], 0xaa55
+    cmp word[0x85fe], 0xaa55
     jne not_valid 
     cmp word[0x8000], 0x0000
     je stage2err
@@ -239,8 +239,6 @@ print_str:
 ;   DATA SECTION 
 ;;
 
-FATDATA dd 0x0000
-partition_offset dw 0x0000 
 abs_sect db 0x00
 abs_cyli db 0x00
 abs_head db 0x00
@@ -251,5 +249,7 @@ disk_fail: db "Read Error", 0x00
 stage2_fail: db "Stage 2 Empty Code", 0x00
 
 
-times 510-($-$$) db 0 
+times 504-($-$$) db 0 
+FATDATA dd 0x0000
+partition_offset dw 0x0000
 db 0x55, 0xaa

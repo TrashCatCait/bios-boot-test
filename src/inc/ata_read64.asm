@@ -57,58 +57,99 @@
 ;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;	ATA READ Function.				  ;
+;	ATA LBA READ Function.				  ;
 ;	JOBS: read data into a memory buffer(rdi register);
 ;	INPUTS: 					  ;
-;	RDI = read in buffer address			  ;
-;	RAX = LBA 48 bit address			  ;
-;	CX = sector count to read			  ;
+;	rdi = read in buffer address			  ;
+;	rax = LBA 48 bit address			  ;
+;	cx = sector count to read			  ;
 ;	bl is the head index and drive 	                  ;
+;	dx = the base port address of the ATA device	  ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+[bits 64]	
+
+;
+;  Right now this is a VERY basic set up it doesn't account for a lot of possiblitys
+;  Drive being busy, Data not being on the first disk, etc... 
+;  I need to think of ways to solve these issues which I'll do at a later date
+;
+
+;;
+;write high bytes then low bytes
+;so 4->5->6->1->2->3
+;Sectors high bytes then low bytes then execute read commnad
 
 
 ata_read_lba:
-    pushfq
+    push rbp
+    mov rbp,rax
     
-    ;;Set the LBA address 
-    mov dx, 0x01f3 
-    out dx, ax
+    add dx, 2 ;Sector count port
+    mov al, ch ;Mov value here to be outputted
+    out dx, al ;higher byte of sector
+    
+    mov rax, rbp ;lba in here
+    
+    ;LBA 4 and LBA 3 now in ah,al
+    bswap eax 
+    inc dx
+    out dx,al 
+
+    shr rax,32 ;LBA 5 and 6 in ah(6),al(5)
+    
+    ;LBA 5 out 
+    inc dx
+    out dx, al
+    
+    ;LBA 6 out 
+    inc dx
+    mov al, ah
+    out dx, al
+
+    mov al,cl ;Sector count low
+    sub dx,3 ;minus 3 from dx to sector port
+    out dx,al ;sector count low bytes
+    
+    ;restore RAX
+    mov rax, rbp
+    
+    ;LBA 1 & 2 are in ah(2) and al(1)
+    ;LBA 1 out 
+    inc dx
+    out dx,al
+    
+    ;LBA 2 out 
+    inc dx
+    mov al,ah
+    out dx,al
+
+    ;LBA 3 out
+    bswap eax  
+    inc dx 
+    mov al,ah
+    out dx,al
 
     inc dx
-    shr rax, 16 ;shift bits to right 16 places
-    out dx, ax
+    or bl, 01000000b ;These bits must be set master/slave bit to be set by user
+    mov al, bl 
+    out dx, al
     
-    inc dx 
-    shr rax, 16 ;shift another 16 places 
-    out dx, ax  
-
-    mov dx,0x01f2
-    mov ax,cx 
-    out dx,ax	;read in cx number of sectors up to 65k odd
-    
-
-    mov dx,0x01f6
-    or bl,11100000b ;Make sure the last bits are set and set them if they aren't while not touching the other bytes
-    mov al,bl
-    out dx,al ;Read drive from bl and head from bl   
-
-    mov dx,0x01f7 ;Command port
-    mov al,0x20 ;Read with retry.
+    inc dx ;Command port
+    mov al,0x24 ;Read Extended 
     out dx,al ;send command
 
-.still_going:   
+.buffer_service: 
     in al,dx
-    test al, 0x08               ;the sector buffer requires servicing.
-    jz .still_going         ;until the sector buffer is ready.
-
-    mov rax,512/2           ;to read 256 words = 1 sector
-    xor bx,bx
-    mov bl,ch               ;read CH sectors
-    mul bx
-    mov rcx,rax             ;RCX is counter for INSW
-    mov rdx,0x1f0            ;Data port, in and out
-    rep insw                ;in to [RDI]
-
-    popfq
+    test al, 0x08 ;DRQ bit set?
+    jz .buffer_service ;until the sector buffer is ready.
+    
+    mov rax, 0x200 ;0x200 = 256 words half of a sector 
+    push dx
+    mul cx ;Multiply this by the sector count to read 
+    mov rcx, rax ;Move result into times to repeat
+    pop dx 
+    sub dx, 7 ;set DX to data port of the drive
+    rep insw ;read in a single word to [rdi] 
+    pop rbp
     ret
 

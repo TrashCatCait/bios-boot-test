@@ -8,6 +8,7 @@
 ;   4) Load new gdt
 ;   5) to long mode 
 ;   4) Load kernel executeable
+;Currently assumes fat table is at 0x0800
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 [org 0x8000]
 [bits 16]
@@ -66,19 +67,15 @@ long_start:
     
     mov rbp, 0x90000
     mov rsp, rbp
-
-    mov edi, 0xB8000              ; Set the destination index to 0xB8000.
-    mov rax, 0x1F201F201F201F20   ; Set the A-register to 0x1F201F201F201F20.
-    mov ecx, 500                  ; Set the C-register to 500.
-    rep stosq                     ; Clear the screen.
     
-    mov rdi, 0x1000
-    xor rax, rax 
-    mov cx, 0x01 
-    mov bl, 00000000b
+    call clear_screen
 
+    mov rdi, 0x0a00 ;Data buffer to read into
+    xor rax, rax ;LBA to read 
+    mov cx, 0x0001 ;Sectors to read 
+    mov bl, 00000000b ;head and drive selectors heads is not used in lba I think
+    mov dx, 0x01f0
     call ata_read_lba
-    
     mov dx, 0x01f1
     in ax, dx
     
@@ -86,77 +83,91 @@ long_start:
     test ax, 0
     jz no_err
 
-    err:
+err:
+    mov rsi, readerr
+    call print_lm
     jmp hltloop 
-    no_err:
 
-    ;Print Register Label
-    mov rsi, reg1
-    mov rbx, 0xb8000
-    call print_lm
-
-    ;Print Register Value
-    xor rax,rax 
-    mov ax, word[0x1ffe]
-    mov rdi,rax
-
-    mov rsi,0xb8008
-    call print_reg
-    
-    ;Print Register Label
-    mov rbx, rsi 
-    add rbx, 2
-    mov rsi, reg2
-    
-    call print_lm
-    
-    mov rsi,rbx
-    xor rbx,rbx
+no_err:
     mov bx, word[0x07fe]
-    mov rdi, rbx
-
-    call print_reg
-
-    jmp hltloop
+    mov ax, word[0x0bfe]
+    cmp ax,bx
+    je equal
+    jne notequal
 
 %include './inc/print_64.asm'
 %include './inc/ata_read64.asm'
 
-print_reg:
+equal:
+    mov rbx, 0xb8000
+    mov rsi, same
+    call print_lm
+    ;Wanted to use RDI but needed it for the future so used rsi
+    ;For simplicity
+    mov rsi, 0x0800 
+
+    next_entry:
+	xor rax,rax
+	mov ax, word[0x0800 + 0x003a]
+	call calc_lba
+	mov rdi, 0x10000 ;load kernel at offset 0x10000
+	mov cx, 0x0012
+	mov bl, 00000000b 
+	mov dx, 0x01f0
+	call ata_read_lba
+
+	xor rax,rax
+	mov rax, qword[0x10000]
+	mov rdi,rax
+	mov ebx, 0xb8000
+	call print_reg
+    jmp hltloop 
     
+notequal:
+    mov rbx, 0xb8000
+    mov rsi, diskverifyerror
+    call print_lm
+    push rbx
     xor rax,rax
-    mov ecx,16
-    lea rdx, [hex_ascii]
+    xor rbx,rbx
 
-    .loop:
-	rol rdi, 4 
-	mov al, dil
-	and al, 0x0f
-	mov al, byte[hex_ascii+rax]
-	
-	mov [rsi], al
-	add rsi, 2 
-	dec ecx
-	jnz .loop
-
-    .exit:
-	ret
+    mov bx, word[0x07fe]
+    mov rdi, rbx
+    pop rbx
+    add rbx,0x3e
+    
+    call print_reg
+    mov ax, word[0x0bfe]    
+    add rbx, 2
+    mov rdi,rax
+    call print_reg
+    jmp hltloop
 
 hltloop:
     hlt
     jmp hltloop
 
 
+calc_lba:
+    sub eax, 0x0002 ;clusters start at 2 so zero out the number
+    xor cx,cx 
+    mov cl, byte[0x7c0d] ;mov sectors per cluster to cl
+    mul cx ;ax now equal previous value * cx
+    add eax, dword[0x7df8] ;ax now equals previous + FATDATA sector
+    add ax, word[0x7dfc]
+    ret
+
 ;
 ;Data
 ;
-reg1: db "RAX:", 0x00 
-reg2: db "RBX:", 0x00
+same: db "Disk Confirmed", 0x00
+readerr: db "Disk read error", 0x00
+diskverifyerror: db "unable to confirm disk ports please report to dev", 0x00
 readdone: db "Reading finished no error bits set", 0x00
 a20error: db "Error Enabling A20 Line", 0x00 
 longerror: db "No Long mode support detected", 0x00 
 cpuiderr: db "Error checking CPU", 0x00
 hex_ascii: db "0123456789abcdef", 0x00
 
-times 1022-($-$$) db 0x00
+times 1534-($-$$) db 0x00
 SIGNATURE: db 0x55, 0xaa ;This is here as sort of signature
