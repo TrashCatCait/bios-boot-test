@@ -106,41 +106,69 @@ equal:
     ;For simplicity
     mov rsi, 0x0800 
 
-    next_entry:
-	xor rax,rax
-	mov ax, word[0x0800 + 0x003a]
-	call calc_lba
-	mov rdi, 0x10000 ;load kernel at offset 0x10000
-	mov cx, 0x0012
-	mov bl, 00000000b 
-	mov dx, 0x01f0
-	call ata_read_lba
-
-	xor rax,rax
-	mov rax, qword[0x10000]
-	mov rdi,rax
-	mov ebx, 0xb8000
-	call print_reg
-    jmp hltloop 
+next_entry:
+    mov ax, word[0x0800 + 0x003a]
+    call calc_lba
+    push rax ;push the kernel LBA onto the stack
     
-notequal:
-    mov rbx, 0xb8000
-    mov rsi, diskverifyerror
-    call print_lm
-    push rbx
     xor rax,rax
-    xor rbx,rbx
-
-    mov bx, word[0x07fe]
-    mov rdi, rbx
-    pop rbx
-    add rbx,0x3e
+    xor rdx,rdx
     
-    call print_reg
-    mov ax, word[0x0bfe]    
-    add rbx, 2
+    mov eax, dword[0x0800 + 0x003c] ;work out the size of the kernel 
+    mov ecx, 0x0200 ;divide it by 0x0200 or 512 bytes 
+    div ecx ;divide eax by ecx 
+    mov ecx, eax ;mov the eax value to ecx sector count
+    
+    cmp rdx, 0x00
+    je no_round ;if rdx is zero we don't round up.
+
+round:
+    inc ecx ;rdx is greater than 1 round up and read 1 extra sector
+    xor rdx,rdx ;clean the register 
+
+no_round: 
+    pop rax ;restore the kernels LBA
+    mov rdi, 0x10000
+    mov bl, 00000000b 
+    mov dx, 0x01f0
+    call ata_read_lba
+
+    xor rax,rax
+    mov rax, qword[0x10000]
     mov rdi,rax
+    mov ebx, 0xb8000
     call print_reg
+
+    jmp 0x105c0
+
+jmp hltloop 
+
+notequal:
+    mov rbx, 0xb8000 ;base of video memory
+    mov rsi, diskerror ;load in memory location of null term str
+    call print_lm ;call string print method 
+    
+    add rbx, 0x3e ;move to the next line 
+    mov rsi, buffer1 ;print buffer string 
+    call print_lm ;call print 
+    
+    ;xor out some regs 
+    xor rax,rax
+    xor rdx,rdx
+
+    mov dx, word[0x07fe]
+    mov rdi, rdx ;move the value of rdx into rdi  
+    call print_reg ;print the value of the register 
+    
+    add rbx, 2 ;mov string 1 column along in VGA mem 
+
+    mov rsi, buffer2 ;print buffer string 
+    call print_lm
+
+    mov ax, word[0x0bfe] ;mov the value of our new MBR into ax 
+    mov rdi,rax ;mov rax into rdi 
+    call print_reg ;print rdi register to screen
+
     jmp hltloop
 
 hltloop:
@@ -160,14 +188,20 @@ calc_lba:
 ;
 ;Data
 ;
+buffer1: db "BUF1:", 0x00
+buffer2: db "BUF2:", 0x00 
 same: db "Disk Confirmed", 0x00
 readerr: db "Disk read error", 0x00
-diskverifyerror: db "unable to confirm disk ports please report to dev", 0x00
+diskerror: db "Unable to confirm disk ports please report to dev", 0x00
 readdone: db "Reading finished no error bits set", 0x00
 a20error: db "Error Enabling A20 Line", 0x00 
 longerror: db "No Long mode support detected", 0x00 
 cpuiderr: db "Error checking CPU", 0x00
 hex_ascii: db "0123456789abcdef", 0x00
 
-times 1534-($-$$) db 0x00
+;NO LONGER NEEDED
+;At the moment the bootloader has to be divsiable by 512
+;So my solution 512*number of sectors minus 2
+;times (512*4)-($-$$)-2 db 0x00
+
 SIGNATURE: db 0x55, 0xaa ;This is here as sort of signature
