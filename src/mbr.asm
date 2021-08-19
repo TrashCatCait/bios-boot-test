@@ -113,6 +113,12 @@ print_pt:
 setup_menu:
     ;set up menu to position one
     mov bl, 1
+    mov ah, 0x02
+    int 0x16
+
+    and al, 0x03
+    cmp al, 0x00
+    je boot
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;         Menu Loop         ;

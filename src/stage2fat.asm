@@ -25,9 +25,20 @@ stage2_start:
     
     sti
     
+    xor edi,edi
+    mov ax,0xb101 
+    int 0x1a
+
+    mov byte[pciah], ah
+    mov byte[pcial], al
+    mov byte[pcimajver], bh
+    mov byte[pciminver], bl
+    mov byte[pcimaxbus], cl
+    mov dword[pcientry], edi
+    mov dword[pcistring], edx
+
     call enableA20
     jmp load_protected
-    jmp $
     
 %include './inc/a20.asm'
 %include './inc/gdt32.asm'
@@ -42,7 +53,7 @@ protected_start:
     mov es, ax
     mov fs, ax
     mov gs, ax
-
+    
     mov ebp, 0x90000 ;stack here so it grows away from VGA video memory 
     mov esp, ebp
     
@@ -92,11 +103,7 @@ no_err:
     mov bx, word[0x07fe]
     mov ax, word[0x0bfe]
     cmp ax,bx
-    je equal
     jne notequal
-
-%include './inc/print_64.asm'
-%include './inc/ata_read64.asm'
 
 equal:
     mov rbx, 0xb8000
@@ -133,15 +140,38 @@ no_round:
     mov dx, 0x01f0
     call ata_read_lba
 
+    ;PCI temp code
+    ;print PCI information about PCI
     xor rax,rax
-    mov rax, qword[0x10000]
-    mov rdi,rax
-    mov ebx, 0xb8000
+    mov al, byte[pcial] 
+    mov ah, byte[pciah]
+    mov rdi, rax
+    mov ebx, 0xb8000 
     call print_reg
 
-    jmp 0x105c0
+    mov al, byte[pcimaxbus]
+    mov rdi, rax
+    add ebx, 0x80
+    call print_reg
 
-jmp hltloop 
+    mov ah, byte[pcimajver]
+    mov al, byte[pciminver]
+    mov rdi, rax
+    add ebx, 0x80 
+    call print_reg
+
+    mov eax, dword[pcientry]
+    mov rdi, rax
+    add ebx, 0x80 
+    call print_reg 
+
+    mov eax, dword[pcistring]
+    mov rdi, rax
+    add ebx, 0x80
+    call print_reg
+    
+
+    jmp hltloop 
 
 notequal:
     mov rbx, 0xb8000 ;base of video memory
@@ -168,7 +198,7 @@ notequal:
     mov ax, word[0x0bfe] ;mov the value of our new MBR into ax 
     mov rdi,rax ;mov rax into rdi 
     call print_reg ;print rdi register to screen
-
+    
     jmp hltloop
 
 hltloop:
@@ -185,6 +215,9 @@ calc_lba:
     add ax, word[0x7dfc]
     ret
 
+%include './inc/print_64.asm'
+%include './inc/ata_read64.asm'
+
 ;
 ;Data
 ;
@@ -198,6 +231,15 @@ a20error: db "Error Enabling A20 Line", 0x00
 longerror: db "No Long mode support detected", 0x00 
 cpuiderr: db "Error checking CPU", 0x00
 hex_ascii: db "0123456789abcdef", 0x00
+
+pciah: db 0x00 
+pcial: db 0x00
+pcimajver: db 0x00 
+pciminver: db 0x00
+pcimaxbus: db 0x00
+pcistring: dd 0x00
+pcientry: dd 0x00
+
 
 ;NO LONGER NEEDED
 ;At the moment the bootloader has to be divsiable by 512

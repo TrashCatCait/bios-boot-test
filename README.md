@@ -45,7 +45,7 @@ Help with the project and code contributions are always welcome. Though I do hav
 
 If your code does have issues/isn't bug free and you don't know how to fix it. Feel free to still submit a request others including myself can potentially help solve the bug.
 
-For small changes pull requests are more than welcome but for larger changes to the code base I would prefer for you to file an issue to being with [MERGE REQUEST] in the title with a detailed description of what you code is. Why you think it should be changed and what exactly the changed code does. E.G. "[MERGE REQUEST] Code update to fix program on old UEFI versions"
+For small changes pull requests are more than welcome but for larger changes to the code base I would prefer for you to file an issue to being with [MERGE REQUEST] in the title with a detailed description of what you code is. Why you think it should be changed and what exactly the changed code does. E.G. "[MERGE REQUEST] Code update to fix program on old BIOS versions"
 
 
 # FAQ
