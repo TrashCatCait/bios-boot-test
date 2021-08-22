@@ -140,36 +140,84 @@ no_round:
     mov dx, 0x01f0
     call ata_read_lba
 
-    ;PCI temp code
-    ;print PCI information about PCI
-    xor rax,rax
-    mov al, byte[pcial] 
-    mov ah, byte[pciah]
-    mov rdi, rax
-    mov ebx, 0xb8000 
-    call print_reg
+    ; Only relavent to access mode #1 not used in #2     
+    ; PCI port 0x0cf8 config port 
+    ; access mode #1 layout 
+    ;  bits  |  desc
+    ; --------------- 
+    ; 31 	enable bit ; boolean 
+    ; 30 - 24 	reserved ; reserved 7 bits 
+    ; 23 - 16 	PCI bus number ; 8 bits in length
+    ; 15 - 11 	PCI device number ; 5 bits in length 
+    ; 10 - 8 	PCI Function ; 3 bits in length (Used for multifunction devices)
+    ; 7 - 0	Register offset ; 8 bits select which register of the 256 byte config to read
+    ;
+    ; PCI port 0x0cfc data port
+    ; 32 bit port prints the registers at Register offset
+    ; So Vendor ID and Device ID at offset 0x00 
+    ;
+    ; Only relavent to access mode #2 not used in 1 
+    ; port 0x0cf8 config port 
+    ; 7 - 4 	key 0 = access mechnism disabled. not(0) = enabled
+    ; 3 - 1 	PCI function number
+    ; 0 	Special cycle enabled if set
+    ; 
+    ; port 0x0cfa forwarding register 8 bit register selects PCI bus
+    ; ports 0xc000 - 0xcfff access PCI configuration space
+    ; 15 - 12 	must be 1100b
+    ; 11 - 8 	dev num
+    ; 7 - 2	Register index
+    ; 1 - 0	must be zero
 
-    mov al, byte[pcimaxbus]
-    mov rdi, rax
-    add ebx, 0x80
-    call print_reg
-
-    mov ah, byte[pcimajver]
-    mov al, byte[pciminver]
-    mov rdi, rax
-    add ebx, 0x80 
-    call print_reg
-
-    mov eax, dword[pcientry]
-    mov rdi, rax
-    add ebx, 0x80 
-    call print_reg 
-
-    mov eax, dword[pcistring]
-    mov rdi, rax
-    add ebx, 0x80
-    call print_reg
+    ;
+    ; we are just using acess mekanism 1 for now
+    ; as that's all my PCs and VMS support. Will work on 2 later
+    ;
+    mov eax, 0x80000000
+    mov ecx, 0x8000ff00
+    mov ebx, 0xb8000
+pci_print:
+    mov dx, 0x0cf8
     
+    out dx, eax
+    
+    mov dx, 0x0cfc
+    push rax
+    in eax, dx
+     
+    cmp eax, 0xffffffff
+    je next_device
+    mov rdi, rax 
+    push rcx
+    call print_reg
+    pop rcx
+    add ebx, 0x02
+
+next_func:
+    pop rax
+    mov edx, eax ;Save register value
+    and eax, 0x00000700
+    cmp eax, 0x00000700;Check if we are on the last function bit
+    mov eax, edx
+    je next_device
+    add eax, 0x00000100
+    jne pci_print
+
+next_device:
+    pop rax 
+    cmp eax, ecx
+    je next_bus
+    add eax, 0x00000800
+    sub eax, 0x00000700
+    jmp pci_print
+
+next_bus:
+    cmp eax, 0x80ffff00 ;If we've scanned the entire bus goto hlt loop
+    je hltloop
+    add eax, 0x00010000
+    add ecx, 0x00010000 
+    sub eax, 0x0000ff00 ;Reset to device and function 0 of new bus
+    jmp pci_print
 
     jmp hltloop 
 
