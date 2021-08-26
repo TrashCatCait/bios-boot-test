@@ -46,7 +46,7 @@ real_start:
     cli 
      
     ;Clear segement regs
-    xor eax, eax
+    xor eax, eax ;clean out whole of EAX as we use it later and need it to be clear 
     mov ss, ax
     mov es, ax
     mov gs, ax
@@ -92,26 +92,27 @@ real_start:
     mov cx, 0x10 ;We search the first 16 file entries 
     
     next_entry:
-    push cx
-    mov ax, word[di + 0x003a]
+    push cx ;save cx so we don't overwrite it.
+    mov ax, word[di + 0x003a];read in the disk start cluster 
     
     ;Load stage2 here
-    call calc_lba
-    mov bx, 0x8000
+    call calc_lba ;
+    mov bx, 0x8000 ;address to load bx at
     push eax ;Push the LBA address on to the stack to keep it safe
     
-    xor dx,dx 
+    xor dx,dx ;Clear out DX as it's important that it equals zero
+    
     ;Calculate the size of the stage2 file
     mov ax, word[di + 0x003c] ;Read in a word of the size 
     mov cx, 0x0200 ;move 512 bytes into ecx  
     div cx ;Divide 
     mov cx,ax ;move the result into the cx register
     
-    cmp dx, 0x00
-    je no_round
+    cmp dx, 0x00 ;if remainder of divide is 0
+    je no_round ;dont round up just skip to no_round
 
 round:
-    inc cx
+    inc cx ;round up to read on more sector
 
 no_round:
     pop eax ;restore the EAX register the LBA val
@@ -142,18 +143,18 @@ not_valid:
 ;  LBA READ DISK
 ;
 disk_reset:
-    xor ax,ax
-    mov dl, [DriveNum]
-    int 0x13
-    jc disk_reset
+    pusha ;save all registers 
+    xor ax,ax ;disk reset function for int 13
+    mov dl, [DriveNum] ;drive to reset
+    int 0x13 ;call interupt 
+    jc disk_reset ;if an error occurs while resetting try reset again
     
-    ret 
+    popa ;restore all registers 
+    ret ;return 
 
 
 lba_read:
-    pusha
     call disk_reset 
-    popa
     
     push dword 0x00 
     push dword eax
@@ -180,9 +181,7 @@ lba_read:
 ; outdated but may be needed 
 ; Currently unworking reads wrong disk sectors I think
 chs_read:
-    pusha 
     call disk_reset
-    popa
 
     call lba_to_chs 
     mov ah, 0x02 ;BIOS READ int 0x13

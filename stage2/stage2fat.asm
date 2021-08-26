@@ -10,9 +10,9 @@
 ;   4) Load kernel executeable
 ;Currently assumes fat table is at 0x0800
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-[org 0x8000]
 [bits 16]
 
+section .text
 
 stage2_start:
     cli 
@@ -47,6 +47,7 @@ stage2_start:
 [bits 32]
 
 protected_start:
+    ;reload the data segement registers to 32 gdt data entry
     mov ax, data32
     mov ds, ax
     mov ss, ax
@@ -55,7 +56,7 @@ protected_start:
     mov gs, ax
     
     mov ebp, 0x90000 ;stack here so it grows away from VGA video memory 
-    mov esp, ebp
+    mov esp, ebp ;stack = base pointer 
     
     call checkcpuid
     call enable_paging
@@ -69,21 +70,27 @@ protected_start:
 
 [bits 64]
 long_start:
-    mov ax, data64
+    ;reload the data segement registers with out new gdt data entry.
+    mov ax, data64 
     mov ds, ax
     mov es, ax 
     mov fs, ax
     mov gs, ax
     mov ss, ax
     
-    mov rbp, 0x90000
-    mov rsp, rbp
+    mov rbp, 0x90000 ;stack placed just beloe video memory
+    mov rsp, rbp ;stack = base pointer
     
+    ;Disable PIC
+    mov al, 0xff
+    out 0xa1, al
+    out 0x21, al
+
     call clear_screen
-    call find_acpi
-	
+    call init_acpi
+
+
     mov rsi, acpi_on 
-    mov ebx, 0x00b8000
     call print_lm
 
 hltloop:
@@ -98,7 +105,23 @@ hltloop:
 ;
 ;Data
 ;
-acpi_on: db "acpi exists", 0x00 
+section .bss 
+align 4096
+
+p4_table:
+    resb 4096 ;reseve space for 1024 entries 
+p3_table: 
+    resb 4096 ;ditto as above 
+p2_table:
+    resb 4096 ;ditto as above
+p1_table: 
+    resb 4096 ;ditto
+
+;
+;Data
+;
+section .data
+acpi_on: db "ACPI Exists", 0x00 
 buffer1: db "BUF1:", 0x00
 buffer2: db "BUF2:", 0x00 
 same: db "Disk Confirmed", 0x00
@@ -109,7 +132,6 @@ a20error: db "Error Enabling A20 Line", 0x00
 longerror: db "No Long mode support detected", 0x00 
 cpuiderr: db "Error checking CPU", 0x00
 hex_ascii: db "0123456789abcdef", 0x00
-
 pciah: db 0x00 
 pcial: db 0x00
 pcimajver: db 0x00 

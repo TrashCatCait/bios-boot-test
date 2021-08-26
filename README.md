@@ -10,6 +10,17 @@ This project is a MBR bootloader that will boot the VBR of any disk and execute 
 
 ___
 
+# How to use:
+So there are a few keys to remember for the MBR bootloader. Firstly there is the `shift` key that allows you to open the partition select menu when held down when the PC is booting. The `W` or `S` keys are used to move the partition selector menu option up or down one place and the `Enter` key boots the currently selected partitions partition entry code(This MBR code does assume that the partitions file system has empty space at the start or a VBR to write X86 bootloaders to). 
+
+Note the bootloader while not boot, a partition if it doesn't not have the `0xaa55` boot signature as the last two bytes. Or if the first two bytes equal `0x0000` as either of those would imply an empty bootloader or a invalid one. This is simply a procetion measure as we don't want "code" being loaded in then the computer jumping to these empty bits and just running wild. As for example if some where in the incorrect code we loaded in there happened to be the bytes to format a disk using BIOS interupts that could make this potentially destructive so this check is intended to prevent this from happening on accident.
+
+The exact contents of stage 1 and 2 bootloader code will vary depending on the filesystem they have been written two. Though 90% of the code should be the same the only differences should be the filesystem reading code as of course FAT32 stores files differently than EXT4 for example meaning the code to decode a files location and load it into RAM would have to be different for these two.
+
+From there stage 1 and 2 should take over and handle the rest of the boot sequence without user input printing errors as it goes.
+
+___
+
 # How To Build:
 
 So currently to build this project you simply need to either run the make file provided or run `nasm -fbin src/start.asm -o mbr.bin`. This will change as I start work on stage2 and so though. Please see listed tool versions below if errors are encountered while building.

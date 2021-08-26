@@ -40,6 +40,7 @@ mbr_start:
     mov ss, ax
     mov es, ax
     mov ds, ax
+    mov gs, ax
     ;Set up stack 
     ;Stack technically will grow towards our mbr code.
     ;This isn't an issue as we won't be pushing a lot to stack 
