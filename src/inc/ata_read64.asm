@@ -143,7 +143,7 @@ ata_read_lba:
     test al, 0x08 ;DRQ bit set?
     jz .buffer_service ;until the sector buffer is ready.
     
-    mov rax, 0x200 ;0x200 = 256 words half of a sector 
+    mov rax, 0x100 ;0x100 = 256 words half of a sector 
     push dx
     mul cx ;Multiply this by the sector count to read 
     mov rcx, rax ;Move result into times to repeat

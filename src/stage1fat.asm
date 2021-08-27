@@ -46,7 +46,7 @@ real_start:
     cli 
      
     ;Clear segement regs
-    xor eax, eax
+    xor eax, eax ;clean out whole of EAX as we use it later and need it to be clear 
     mov ss, ax
     mov es, ax
     mov gs, ax
@@ -79,9 +79,6 @@ real_start:
     ;So this currently only works with Fat32 but I'll try and make it compatiable later
     ;TODO With other FATS though not a huge deal now  
     
-    ;;TODO
-    ;;Now we want to read the first data sector to start looking at the files.
-    ;;For now we will hard code this to load the first file but later I'll work on 
     ;;Making it actually look for the second stage.
     mov ax, word[RootDirStart]
     call calc_lba
@@ -92,48 +89,72 @@ real_start:
     mov di, 0x0800
  
     ;We loop here to load the next file if the last one is incorrect
-    next_entry: 
-    mov ax, word[di + 0x003a]
+    mov cx, 0x10 ;We search the first 16 file entries 
+    
+    next_entry:
+    push cx ;save cx so we don't overwrite it.
+    mov ax, word[di + 0x003a];read in the disk start cluster 
     
     ;Load stage2 here
-    call calc_lba
-    mov bx, 0x8000
-    mov cx, 0x0003
+    call calc_lba ;
+    mov bx, 0x8000 ;address to load bx at
+    push eax ;Push the LBA address on to the stack to keep it safe
+    
+    xor dx,dx ;Clear out DX as it's important that it equals zero
+    
+    ;Calculate the size of the stage2 file
+    mov ax, word[di + 0x003c] ;Read in a word of the size 
+    mov cx, 0x0200 ;move 512 bytes into ecx  
+    div cx ;Divide 
+    mov cx,ax ;move the result into the cx register
+    
+    cmp dx, 0x00 ;if remainder of divide is 0
+    je no_round ;dont round up just skip to no_round
+
+round:
+    inc cx ;round up to read on more sector
+
+no_round:
+    pop eax ;restore the EAX register the LBA val
     call lba_read
-    cmp word[0x85fe], 0xaa55
-    jne not_valid 
-    cmp word[0x8000], 0x0000
-    je stage2err
+    
+    pop cx
+    mov bx, word[di + 0x003c] ;read in the word size
+    cmp word[0x8000 + bx - 2], 0xaa55 ;compare the last two bytes 
+    jne not_valid ;If they are not equal goto not valid
+    cmp word[0x8000], 0x0000 ;If it is valid but empty goto err
+    je not_valid ;loop again to see if there is a valid oe
 
     ;Jump to stage 2
     jmp 0x0000:0x8000
 
-    ;;Until this is finished this is here just to confirm we are getting to stage1
-    jmp $
 
 ;
-;
+;  If Last entry was invalid
 ;
 not_valid:
-    add di, 0x20
-    jmp next_entry
+    add di, 0x40 ;move to the next file entry 
+    dec cx ;decreament dx 
+    cmp cx, 0x00 ;if dx reaches zero 
+    je stage2err ;print error 
+    jmp next_entry ;else jump next 
     
 ;
 ;  LBA READ DISK
 ;
 disk_reset:
-    xor ax,ax
-    mov dl, [DriveNum]
-    int 0x13
-    jc disk_reset
+    pusha ;save all registers 
+    xor ax,ax ;disk reset function for int 13
+    mov dl, [DriveNum] ;drive to reset
+    int 0x13 ;call interupt 
+    jc disk_reset ;if an error occurs while resetting try reset again
     
-    ret 
+    popa ;restore all registers 
+    ret ;return 
 
 
 lba_read:
-    pusha
     call disk_reset 
-    popa
     
     push dword 0x00 
     push dword eax
@@ -160,9 +181,7 @@ lba_read:
 ; outdated but may be needed 
 ; Currently unworking reads wrong disk sectors I think
 chs_read:
-    pusha 
     call disk_reset
-    popa
 
     call lba_to_chs 
     mov ah, 0x02 ;BIOS READ int 0x13
@@ -245,11 +264,13 @@ abs_head db 0x00
 ;;
 ; strings 
 ;;
+stage2_sig: dw 0x0000
 disk_fail: db "Read Error", 0x00
-stage2_fail: db "Stage 2 Empty Code", 0x00
+stage2_fail: db "Unable to find valid stage 2", 0x00
 
 
 times 504-($-$$) db 0 
 FATDATA dd 0x0000
 partition_offset dw 0x0000
 db 0x55, 0xaa
+

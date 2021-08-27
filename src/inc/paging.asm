@@ -1,23 +1,28 @@
 [bits 32]
 enable_paging:
-    mov edi, 0x1000    ; Set the destination index to 0x1000.
-    mov cr3, edi       ; mov edi into cr3
+    mov eax, p3_table ;load the first entry of page table 3 into eax
+    or eax, 0b11 ;make sure present and writeable bit as set for this page  
+    mov dword[p4_table + 0], eax ;map page table 3 into page table 4
 
-    mov dword [edi], 0x2003
-    add edi, 0x1000
-    mov dword [edi], 0x3003
-    add edi, 0x1000
-    mov dword [edi], 0x4003
-    add edi, 0x1000
+    mov eax, p2_table ;load first entry of table 2 into eax 
+    or eax, 0b11 ;present and writeable bit 
+    mov dword[p3_table + 0], eax ;map table 2 into table 4 
 
-    mov ebx, 0x00000003
-    mov ecx, 512
+    mov ecx, 0x00 ;counter 
 
-    .SetEntry:
-	mov dword [edi], ebx
-	add ebx, 0x1000
-	add edi, 8
-	loop .SetEntry
+map_table_2:
+    mov eax, 0x200000 
+    mul ecx 
+    or eax, 0b10000011
+    mov [p2_table + ecx * 8], eax
+
+    inc ecx 
+    cmp ecx, 512
+    jne map_table_2
+
+    mov edi, p4_table ; Set the destination index to 0x1000.
+    mov cr3, edi ; mov edi into cr3
+
 
     mov eax, cr4
     or eax, 1 << 5
