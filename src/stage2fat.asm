@@ -70,80 +70,38 @@ long_start:
     
     call clear_screen
     xor rbx,rbx
-    mov bx, 0x08
+
     read_ata_disks:
     xor rdx,rdx
-    mov dx, word[ATA_REGS+rbx] 
-    mov rdi, 0x0a00 ;Data buffer to read into
-    xor rax, rax ;LBA to read 
-    mov cx, 0x0001 ;Sectors to read 
+    mov dx, 0x01f0
     push rbx
-    mov bl, 00000000b ;head and drive selectors heads is not used in lba I think
-    
-    call ata_read_lba
-    add dx, 0x01 
-    in ax, dx
-    
-    ;;Tried this and the error bit doesn't seem to be set.
-    test ax, 0
-    jz no_err
+    mov bx, 0xa0 ;master drive read 
+    xor rax,rax
+    mov cx, 0x0001
+    mov rdi, 0x0a00
+    call ata_read
+   
 
-err:
-    mov rsi, readerr
-    mov rbx, 0xb8000
-    call print_lm
-    jmp next_disk 
 
-no_err:
-    mov rax, qword[0x0600]
-    mov rbx, qword[0x0a00]
-    cmp rax,rbx
-    je equal 
-    jne not_equal
 
-equal:
-    call clear_screen
-    mov rsi, same
-    mov rbx, 0xb8000
-    call print_lm
-
+    add rdx,7
+    in al,dx
+    mov rdi, rax
+    mov rbx,0xb8000 
+    call print_reg
+    add rbx,2 
+    mov rdi,qword[0x0a00]
+    call print_reg
+    jmp $
+    pop rbx 
+    add bx, 0x02
+    cmp bx, 0x08
+    jne read_ata_disks
 
 hltloop:
+    cli
     hlt
     jmp hltloop
-
-not_equal:
-    mov rbx, 0xb8000
-    mov rsi, diskverifyerror
-    call print_lm
-    xor rax,rax
-    xor rbx,rbx
-
-    mov rdx, qword[0x0a00]
-    mov rdi, rdx
-    add rbx,0x3e
-    
-    call print_reg
-    mov rax, qword[0x0600]    
-    add rbx, 2
-    mov rdi,rax
-    call print_reg
-
-next_disk:
-    pop rbx
-    cmp bx, 0x00
-    sub bx, 0x02 
-    je hltloop
-    jmp read_ata_disks
-
-calc_lba:
-    sub eax, 0x0002 ;clusters start at 2 so zero out the number
-    xor cx,cx 
-    mov cl, byte[0x7c0d] ;mov sectors per cluster to cl
-    mul cx ;ax now equal previous value * cx
-    add eax, dword[0x7df8] ;ax now equals previous + FATDATA sector
-    add ax, word[0x7dfc]
-    ret
 
 %include './inc/acpi.asm'
 %include './inc/pci.asm'

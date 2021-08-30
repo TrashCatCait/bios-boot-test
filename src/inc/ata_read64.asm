@@ -56,93 +56,76 @@
 ;
 ;;
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;	ATA LBA READ Function.				  ;
-;	JOBS: read data into a memory buffer(rdi register);
-;	INPUTS: 					  ;
-;	rdi = read in buffer address			  ;
-;	rax = LBA 48 bit address			  ;
-;	cx = sector count to read			  ;
-;	bl is the head index and drive 	                  ;
-;	dx = the base port address of the ATA device	  ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-[bits 64]	
+[bits 64]
 
-;
-;  Right now this is a VERY basic set up it doesn't account for a lot of possiblitys
-;  Drive being busy, Data not being on the first disk, etc... 
-;  I need to think of ways to solve these issues which I'll do at a later date
-;
+ata_read:
+    push rax ;save the LBA address 
 
-;;
-;write high bytes then low bytes
-;so 4->5->6->1->2->3
-;Sectors high bytes then low bytes then execute read commnad
+;Check if ata bus returns 0xff assume it doesn't exist if 
+;it does return 0xff
+.present:
+    add dx,7 ;Move to ATA status port
+    in al,dx ;Read in a byte from the port
+    sub dx,7 ;reset dx to the base port
+    cmp al,0xff ;check if the bus is floating. 
+    je ata_read.failure ;if not 0xff jump to rest of read
 
-
-ata_read_lba:
-    push rbp
-    mov rbp,rax
-    
-    add dx, 2 ;Sector count port
-    mov al, ch ;Mov value here to be outputted
-    out dx, al ;higher byte of sector
-    
-    mov rax, rbp ;lba in here
-    
-    ;LBA 4 and LBA 3 now in ah,al
-    bswap eax 
-    inc dx
-    out dx,al 
-
-    shr rax,32 ;LBA 5 and 6 in ah(6),al(5)
-    
-    ;LBA 5 out 
-    inc dx
+;48bit PIO read function
+.lba48:
+    ;1f0 
+    add dx,6 ;point dx to the drive and head port
+    mov al, 11100000b
     out dx, al
+    ;1f2
+    sub dx,4 ;point dx to the sector port
+    mov al,ch;move high byte of sector 
+    out dx,al;output the higher sector count 
     
-    ;LBA 6 out 
-    inc dx
-    mov al, ah
-    out dx, al
+    pop rax ;restore the value of LBA into rax
+    mov rbx,rax ;save original LBA into rbp
 
-    mov al,cl ;Sector count low
-    sub dx,3 ;minus 3 from dx to sector port
-    out dx,al ;sector count low bytes
-    
-    ;restore RAX
-    mov rax, rbp
-    
-    ;LBA 1 & 2 are in ah(2) and al(1)
-    ;LBA 1 out 
-    inc dx
-    out dx,al
-    
-    ;LBA 2 out 
-    inc dx
-    mov al,ah
-    out dx,al
+    bswap eax ;LBA 4 and 3 now in ah(3) and al(4)
+    mov ah,ch;save LBA 3 into ch as we no longer need ch
+    ;1f3
+    inc dx ;point DX to the sector number/LBA low port
+    out dx,al ;output LBA 4 into port
 
-    ;LBA 3 out
-    bswap eax  
+    shr rax,32 ;ah(LBA 6), al(LBA 5)
+    ;1f4
+    inc dx ;point dx to cylinder low port
+    out dx,al ;output LBA5 to port  
+    
+    mov al,ah ;mov LBA6 into al
+    inc dx ;increment dx to 0x01*5
+    out dx,al ;output LBA 6
+    ;1f2 
+    sub dx,3 ;sector count port 
+    mov al,cl ;sector count low byte 
+    out dx,al ;output to port
+
+    mov rax,rbp ;restore LBA 
+    ;1f3
+    inc dx ;point back at the port 
+    out dx,al ;output LBA 1 
+    ;1f4 
+    inc dx ;LBA mid port 
+    mov al,ah ;mov LBA2 in al 
+    out dx,al ;output LBA 2 
+    
+    inc dx ;increment dx
+    mov al,ch ;restore LBA 3 from where we stored it
+    out dx,al ;output LBA 3 to LBA high
+    
     inc dx 
-    mov al,ah
-    out dx,al
-
-    inc dx
-    or bl, 01000000b ;These bits must be set master/slave bit to be set by user
-    mov al, bl 
-    out dx, al
-    
     inc dx ;Command port
     mov al,0x24 ;Read Extended 
     out dx,al ;send command
 
-.buffer_service: 
+.buffer_service:
     in al,dx
     test al, 0x08 ;DRQ bit set?
     jz .buffer_service ;until the sector buffer is ready.
-    
+
     mov rax, 0x100 ;0x100 = 256 words half of a sector 
     push dx
     mul cx ;Multiply this by the sector count to read 
@@ -150,6 +133,25 @@ ata_read_lba:
     pop dx 
     sub dx, 7 ;set DX to data port of the drive
     rep insw ;read in a single word to [rdi] 
-    pop rbp
+    ret
+
+;if read fails set the carry flag and return
+.failure:
+    stc 
+
+.done:
+    ret
+
+;
+;calculate FAT32 LBA
+;This assumes the fat VBR is located at 0x7c00
+;
+calc_lba:
+    sub eax, 0x0002 ;clusters start at 2 so zero out the number
+    xor cx,cx 
+    mov cl, byte[0x7c0d] ;mov sectors per cluster to cl
+    mul cx ;ax now equal previous value * cx
+    add eax, dword[0x7df8] ;ax now equals previous + FATDATA sector
+    add ax, word[0x7dfc]
     ret
 
