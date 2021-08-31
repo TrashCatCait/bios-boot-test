@@ -147,6 +147,7 @@ hltloop:
     hlt
     jmp hltloop
 
+%include './inc/keyboard.asm'
 %include './inc/pic.asm'
 %include './inc/interupts.asm'
 %include './inc/acpi.asm'
