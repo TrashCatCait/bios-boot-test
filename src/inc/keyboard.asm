@@ -54,9 +54,9 @@ keyboard_main_handler:
     mov ebx,dword[current_buffer]
     cmp ebx,0xb8fa0
     jge .handle_overflow
-    mov [ebx],al ;mov character into video memory if it's not special char 
+    mov byte[ebx],al ;mov character into video memory if it's not special char 
     add dword[current_buffer],2 ;add 2 to the video memory value 
-    
+     
     .skip_printing:
     ret
 

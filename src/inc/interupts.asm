@@ -16,7 +16,7 @@
 
 ;Not 100% sure but I think the IDT needs to be filled in at runtime
 idt_start:
-    times (1*16) db 0x00
+    times 16 db 0x00
     dw (BASE + isr1 - $$)
     dw 0x0008
     db 0x00
@@ -34,6 +34,8 @@ isr1:
     pushaq
     call keyboard_main_handler
     ;send end of interupt to the PIC so it knows a new interupt may be processed
+    mov bx,0x0101
+    call set_cur
     mov al,0x20
     out PIC1_Com,al
     out PIC2_Com,al

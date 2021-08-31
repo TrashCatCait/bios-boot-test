@@ -16,7 +16,6 @@ print_lm:
 
 	add ebx, 2
 	
-	call set_cur
 
 	jmp print_lm.loop
 
@@ -28,6 +27,12 @@ print_lm:
 ;
 set_cur:
     ;mov cursor
+    xor edx,edx
+    sub eax,0xb8000
+    mov cx,0x02
+    div cx
+    mov bx,ax
+
     mov dx, 0x03d4
     mov al, 0x0f
     out dx, al

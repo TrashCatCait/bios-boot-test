@@ -71,7 +71,7 @@ long_start:
     call set_cur 
     call clear_screen
     call load_idt
-    mov rbx,0xb8000
+    
     jmp hltloop
     xor rbx,rbx
     add bx,2
