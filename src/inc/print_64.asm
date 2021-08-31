@@ -27,9 +27,9 @@ print_lm:
 ;
 set_cur:
     ;mov cursor
-    xor edx,edx
-    sub eax,0xb8000
-    mov cx,0x02
+    sub eax, 0xb8000
+    mov cx,0x0002
+    xor dx,dx
     div cx
     mov bx,ax
 

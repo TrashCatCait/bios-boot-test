@@ -58,6 +58,8 @@ keyboard_main_handler:
     add dword[current_buffer],2 ;add 2 to the video memory value 
      
     .skip_printing:
+    mov eax,dword[current_buffer]
+    call set_cur
     ret
 
 .handle_overflow:

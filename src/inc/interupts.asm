@@ -34,14 +34,16 @@ isr1:
     pushaq
     call keyboard_main_handler
     ;send end of interupt to the PIC so it knows a new interupt may be processed
-    mov bx,0x0101
-    call set_cur
     mov al,0x20
     out PIC1_Com,al
     out PIC2_Com,al
     popaq
     iretq
 
+isr0:
+    pushaq
+
+    popaq
 
 load_idt:
     call remap_pic
