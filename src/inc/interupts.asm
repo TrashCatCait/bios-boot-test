@@ -18,7 +18,7 @@
 
 ;Not 100% sure but I think the IDT needs to be filled in at runtime
 idt_start:
-    times (33*16) db 0x00
+    times (1*16) db 0x00
     dw (BASE + isr1 - $$)
     dw 0x0008
     db 0x00
@@ -58,8 +58,6 @@ isr1:
 
 
 load_idt:
-    xor rax,rax
-    mov bx,0x2028
     call remap_pic
     lidt [idt_info]
 
