@@ -57,6 +57,17 @@
 ;;
 
 [bits 64]
+;
+; INPUTS:
+; RAX = 48 bit LBA Address 
+; BL = Drive Head and Selector Register 
+; CX = Sector Count 
+; RDI = Buffer To Read Into 
+; DX = Base Legacy ATA Register 
+; 
+; OUTPUT(s):
+; On success = data will be written to memory at RDI 
+; On failure = carry flag(CF) is set and al has an error code
 
 ata_read:
     push rax ;save the LBA address 
@@ -65,16 +76,20 @@ ata_read:
 ;it does return 0xff
 .present:
     add dx,7 ;Move to ATA status port
-    in al,dx ;Read in a byte from the port
-    sub dx,7 ;reset dx to the base port
+    in al,dx
     cmp al,0xff ;check if the bus is floating. 
     je ata_read.failure ;if not 0xff jump to rest of read
+    cmp al, 0x00 ;also known to cause problems with empty CD drives
+    je ata_read.failure
+    ;will work on implementing a better method to deal with this
+
 
 ;48bit PIO read function
 .lba48:
     ;1f0 
+    sub dx,7
     add dx,6 ;point dx to the drive and head port
-    mov al, 11100000b
+    mov al, bl
     out dx, al
     ;1f2
     sub dx,4 ;point dx to the sector port
@@ -85,7 +100,7 @@ ata_read:
     mov rbx,rax ;save original LBA into rbp
 
     bswap eax ;LBA 4 and 3 now in ah(3) and al(4)
-    mov ah,ch;save LBA 3 into ch as we no longer need ch
+    mov bh,ah;save LBA 3 into ch as we no longer need ch
     ;1f3
     inc dx ;point DX to the sector number/LBA low port
     out dx,al ;output LBA 4 into port
@@ -113,7 +128,7 @@ ata_read:
     out dx,al ;output LBA 2 
     
     inc dx ;increment dx
-    mov al,ch ;restore LBA 3 from where we stored it
+    mov al,bh ;restore LBA 3 from where we stored it
     out dx,al ;output LBA 3 to LBA high
     
     inc dx 
@@ -127,23 +142,26 @@ ata_read:
     jz .buffer_service ;until the sector buffer is ready.
 
     mov rax, 0x100 ;0x100 = 256 words half of a sector 
-    push dx
+    
+    push dx ;save dx as it's over written by mul 
     mul cx ;Multiply this by the sector count to read 
     mov rcx, rax ;Move result into times to repeat
-    pop dx 
+    pop dx  ;restore DX 
+    
     sub dx, 7 ;set DX to data port of the drive
     rep insw ;read in a single word to [rdi] 
-    ret
+    jmp ata_read.done
 
 ;if read fails set the carry flag and return
 .failure:
-    stc 
+    pop rax
+    stc ;set the carry flag  
 
 .done:
-    ret
+    ret ;return 
 
 ;
-;calculate FAT32 LBA
+;calculate FAT32 LBAS
 ;This assumes the fat VBR is located at 0x7c00
 ;
 calc_lba:
