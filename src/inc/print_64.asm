@@ -4,50 +4,22 @@
 ;	returns nothing
 ;;
 print_lm:
-	
-    .loop:
-        lodsb
-	mov ah, 0x1f 
-
-	cmp al, 0x00
-	je print_lm.done
-
-	mov [ebx], ax
-
-	add ebx, 2
-	
-
-	jmp print_lm.loop
-
-    .done:
-	ret
-
-;
-; Set the cursor location
-;
-set_cur:
-    ;mov cursor
-    sub eax, 0xb8000
-    mov cx,0x0002
-    xor dx,dx
-    div cx
-    mov bx,ax
-
-    mov dx, 0x03d4
-    mov al, 0x0f
-    out dx, al
-
-    inc dl
-    mov al, bl
-    out dx, al
     
-    dec dl
-    mov al, 0x0e
-    out dx, al
+.loop:
+    lodsb
+    mov ah, 0x1f 
+
+    cmp al, 0x00
+    je print_lm.done
+
+    mov [ebx], ax
+
+    add ebx, 2
     
-    inc dl
-    mov al, bh
-    out dx, al
+
+    jmp print_lm.loop
+
+.done:
     ret
 
 ;
@@ -60,19 +32,19 @@ print_reg:
     mov ecx,16
     lea rdx, [hex_ascii]
 
-    .loop:
-	rol rdi, 4 
-	mov al, dil
-	and al, 0x0f
-	mov al, byte[hex_ascii+rax]
-	
-	mov [ebx], al
-	add ebx, 2 
-	dec ecx
-	jnz .loop
+.loop:
+    rol rdi, 4 
+    mov al, dil
+    and al, 0x0f
+    mov al, byte[hex_ascii+rax]
+    
+    mov [ebx], al
+    add ebx, 2 
+    dec ecx
+    jnz .loop
 
-    .exit:
-	ret
+.exit:
+    ret
 
 clear_screen:
     mov edi, 0xB8000              ; Set the destination index to 0xB8000.
