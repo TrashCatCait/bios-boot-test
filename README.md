@@ -26,6 +26,14 @@ ___
 
 # Issues:
 
+### Known Issues:
+Below is a list of all the issues that I know of at this point. Either through my testing or what others have told me about.
+
+- ATA Load function:
+Doesn't work correctly on "Desktops"(I'm still unsure what exactly is causing this issue, but at the moment it I've only found this happening on Desktop computers.). But basically all ATA buses report 0xff which would imply the ports don't exist. I need to spend some time to try and find the exact issue. Seems to work on the laptops I've tested on (Lenovo ThinkPad T530) and on Virtual machines.
+
+If you find this issue on non-desktop computers or have some insigth into this please feel free to open an issue and I'll happily look over it. As it may help me track down the exact issue. 
+
 ### Building Issues:
 If you encountered an error during building this project I'd suggest double checking our tool versions are the same and checking you're on the master branch as it could just be a broken unstable branch. But if none of the above helped you and you're still facing issues please feel free to file an issues with a descriptive title and the output of your nasm assembler for debuging.
 
@@ -33,7 +41,7 @@ If you encountered an error during building this project I'd suggest double chec
 So if you encounter a problem during running and you suspect it's a bug or mistake please file a detailed report. Describing the bug and anything you did to cause it and the type of media you booted off of.
 
 
-But if you suspect that it's an issue related to your BIOS or if I attempt to replicate it but am unable to I'll likely ask for you're hardware setup(Mainly motherboard and BIOS version and the boot media used{usb, HDD, m.2/Sata SSD}) as this could be potential causes if your BIOS maybe operates slightly differently. 
+But if you suspect that it's an issue related to your BIOS or if I attempt to replicate it but am unable to I'll likely ask for you're hardware setup(Mainly motherboard and BIOS version and the boot media used{USB Device, {IDE,SATA} HDD, {M.2, SATA} SSD}. If it's connected directly to the motherboard or through a PCI device) as this could be potential causes if your BIOS maybe operates slightly differently. 
 
 I will always try to make this runnable across all machines and BIOS but I can't test this or promise this but I will attempt to fix bugs related to different BIOS when they are reported to me. 
 

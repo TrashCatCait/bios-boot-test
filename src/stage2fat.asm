@@ -68,85 +68,91 @@ long_start:
     mov rbp, 0x90000
     mov rsp, rbp
     
-    call set_cur 
-    call clear_screen
-    call load_idt
+    mov eax,0x000b8000
+    call set_cur
+    call clear_screen ;clear the screen
+    call load_idt ;load and enable our IDT this is useless rn. I hope in the future
+    ;I can add interupts for reading from disks.
     
-    jmp hltloop
     xor rbx,rbx
-    add bx,2
-read_ata_disks:
-    xor rdx,rdx
-    mov dx, word[ATA_REGS+rbx]
-    push rbx
-    mov bl, 11100000b ;master drive read 
-    xor rax,rax
-    mov cx, 0x0001
-    mov rdi, 0x0a00
-    call ata_read
-    jc next_dev
-    
-    mov rax,qword[0x0600]
-    mov rbx,qword[0x0a00]
-    cmp rax,rbx
-    je found_mbr
-    
-next_dev:
-    pop rbx ;pop the current ATA reg counter off the stack 
-    add bx, 0x02
-    cmp bx, 0x08
-    jne read_ata_disks
-
-verification_error:
-    mov rsi,verifyerror
-    mov rbx, 0xb8000
-    call print_lm 
-    add rbx, 0x22
-    push rbx
-
-    xor rcx,rcx
-    xor rax,rax
-    mov al,0x06
-    mov ecx,0x04 
-
-ata_statuses:
-    mov rsi,ata_bus
-    mov byte[rsi+4],cl 
-    add byte[rsi+4],0x30 ;print bus number 
-    push rax ;save rax as print_lm modifies it
-    call print_lm
-    
-    pop rax ;restore rax
-    push rbx ;annoying I have to use bx for this buffer 
-    mov rbx,rax ;move rax into rbx  
-    mov rdx,[ATA_REGS+rbx] ;get the ATA Bus we want to read 
-    pop rbx ;restore video memory position 
-    
-    push rax ;save rax as we mess with it below 
-    add dx,7 ;point dx to the status register
-    in al,dx ;read in the status register 
-    mov rdi,rax
-    push rcx ;save RCX 
-    call print_reg
-
-    pop rcx ;restore rcx as print_reg modifies it 
-    pop rax ;restore rax as print_reg modifies it 
-    sub al,2 ;mov onto the next ata port
-    add rbx, 0x74
-
-    loop ata_statuses
-
-    jmp hltloop
+    jmp read_ata_disks
 
 ;at the moment we assume that the first byte(s) of the MBR being the same 
 ;mean we've found the same disk I'll work on making this more robust
 ;but this is nice and simply for testing. 
 found_mbr:
+    mov rsi,same 
+    mov rbx,0xb8000
+    call print_lm ;print disk found string
 
+;we assume FAT root sector is loaded at 0x800 
+;need to clean this up so that it's more intellegient in future but
+;hard coding it a good way to test if something works.
+pop rbx
+mov rdi,0x800 ;Where we loaded root dir in stage 1 loader
+mov cx, 0x08 ;root directory entries to be read.	
+find_kernel:
+    xor rax,rax;clear out rax register for calculating the LBA into
+    push rcx ;save the counter for root directorty entries  
+    mov ax, word[rdi + 0x003a] ;read in the disk start cluster of file 
+    
+    call calc_lba ;call lba calculation function 
+    push rax ;save LBA in EAX 
+    xor edx,edx ;clear dx for division
+
+    mov ax, word[rdi + 0x003c]
+    mov cx, 0x0200
+    div cx
+    mov cx,ax
+
+    cmp dx,0x00
+    je no_round 
+
+round:
+    inc cx ;round cx up by one  
+
+no_round:
+    pop rax
+    push rax
+    mov dx,[rbx+ATA_REGS]
+    push rdi ;save rdi 
+    push rbx
+    mov bl, 11100000b
+    mov rdi, 0x10000 ;where to begin loading the kernel.
+    call ata_read
+    
+    pop rbx
+    
+    ;	TODO:
+    ;	Add a method to verify the kernel executeable. 
+    ;	Either using the multiboot 2 standard or my own 
+    ;	signature though I'm leaning towards MB2 standard
+    ;	as that allows users to use grub and other
+    ; 	multiboot compatiable bootloaders by default with 
+    ;	no extra work needed
+
+    mov rax,qword[0x10000]
+    mov rdi,rax
+    mov rbx,0xb8000
+    call print_reg
+    jmp $
+;
+;
+;
+next_entry:
+    pop rbx ;restore rbx
+    pop rdi ;restore rdi 
+    pop rcx ;restore rcx
+    add di, 0x40
+    dec cx 
+    cmp cx, 0x00 
+    jnz find_kernel
+ 
 hltloop:
     hlt
     jmp hltloop
 
+%include './inc/ata_disk_loop.asm'
 %include './inc/keyboard.asm'
 %include './inc/pic.asm'
 %include './inc/interupts.asm'

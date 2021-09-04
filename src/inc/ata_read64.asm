@@ -86,21 +86,22 @@ ata_read:
 
 ;48bit PIO read function
 .lba48:
+    push rcx 
     ;1f0 
     sub dx,7
-    add dx,6 ;point dx to the drive and head port
-    mov al, bl
-    out dx, al
     ;1f2
-    sub dx,4 ;point dx to the sector port
+    add dx,2 ;point dx to the sector port
     mov al,ch;move high byte of sector 
     out dx,al;output the higher sector count 
     
+    pop rcx 
     pop rax ;restore the value of LBA into rax
-    mov rbx,rax ;save original LBA into rbp
+    push rcx
+    
+    mov rbp,rax ;save original LBA into rbp
 
     bswap eax ;LBA 4 and 3 now in ah(3) and al(4)
-    mov bh,ah;save LBA 3 into ch as we no longer need ch
+    mov ch,ah;save LBA 3 into ch as we no longer need ch
     ;1f3
     inc dx ;point DX to the sector number/LBA low port
     out dx,al ;output LBA 4 into port
@@ -128,19 +129,23 @@ ata_read:
     out dx,al ;output LBA 2 
     
     inc dx ;increment dx
-    mov al,bh ;restore LBA 3 from where we stored it
+    mov al,ch ;restore LBA 3 from where we stored it
     out dx,al ;output LBA 3 to LBA high
     
-    inc dx 
+    inc dx
+    mov al,bl
+    out dx,al
+
     inc dx ;Command port
     mov al,0x24 ;Read Extended 
     out dx,al ;send command
-
 .buffer_service:
     in al,dx
-    test al, 0x08 ;DRQ bit set?
+    test al,0x01 
+    jnz .error
+    test al,0x08 ;DRQ bit set?
     jz .buffer_service ;until the sector buffer is ready.
-
+    pop rcx
     mov rax, 0x100 ;0x100 = 256 words half of a sector 
     
     push dx ;save dx as it's over written by mul 
@@ -153,6 +158,10 @@ ata_read:
     jmp ata_read.done
 
 ;if read fails set the carry flag and return
+.error:
+    sub dx,6
+    in al,dx
+    jmp $
 .failure:
     pop rax
     stc ;set the carry flag  

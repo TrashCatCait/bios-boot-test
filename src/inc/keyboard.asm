@@ -61,10 +61,10 @@ keyboard_main_handler:
     jge .handle_overflow ;if greater than or equal goto handle overflow
 
     mov byte[rbx],al ;mov character into video memory if it's not special char 
-    add dword[current_buffer],2 ;add 2 to the video memory value 
+    add dword[current_buffer],0x02 ;add 2 to the video memory value 
      
     .skip_printing:
-    mov eax,dword[current_buffer] ;set eax to video memory 
+    mov ebx,dword[current_buffer] ;set eax to video memory 
     call set_cur ;set the cursor to one after the current char 
     ret ;return from keyboard controller 
 
@@ -76,7 +76,8 @@ keyboard_main_handler:
 ; Set the cursor location
 ;
 set_cur:
-    ;mov cursor
+    push rbx ;save rbx 
+    mov eax,ebx ;move current video memory location into eax
     xor dx,dx ;clean dx for divide operation 
     sub ax, 0x8000 ;sub higher bytes of video memory
     mov cx,0x0002 ;mov 2 in cx 
@@ -86,18 +87,16 @@ set_cur:
     mov dx, 0x03d4 
     mov al, 0x0f
     out dx, al
-
     inc dl
     mov al, bl
     out dx, al
-    
     dec dl
     mov al, 0x0e
     out dx, al
-    
     inc dl
     mov al, bh 
     out dx, al
+    pop rbx ;restore rbx
     ret ;return 
 
 keyset1: db 0x00,0x00,'1234567890-=',0x00,0x00,'qwertyuiop[]',0x00,0x00,"asdfghjkl;'`",0x00,'\zxcvbnm,./',0x00,'*',0x00,' ',0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,'789-456+1230.',0x00,0x00,0x00,0x00,0x00,0x00

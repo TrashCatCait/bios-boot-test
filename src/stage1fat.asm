@@ -89,7 +89,7 @@ real_start:
     mov di, 0x0800
  
     ;We loop here to load the next file if the last one is incorrect
-    mov cx, 0x10 ;We search the first 16 file entries 
+    mov cx, 0x08 ;We search the first 8 file entries 
     
     next_entry:
     push cx ;save cx so we don't overwrite it.

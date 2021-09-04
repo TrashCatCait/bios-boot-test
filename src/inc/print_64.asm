@@ -20,6 +20,7 @@ print_lm:
     jmp print_lm.loop
 
 .done:
+    call set_cur ;set the cursor at the end 
     ret
 
 ;
@@ -41,9 +42,10 @@ print_reg:
     mov [ebx], al
     add ebx, 2 
     dec ecx
-    jnz .loop
+    jnz print_reg.loop
 
 .exit:
+    call set_cur
     ret
 
 clear_screen:
