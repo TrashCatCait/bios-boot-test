@@ -94,51 +94,79 @@ mov cx, 0x08 ;root directory entries to be read.
 find_kernel:
     xor rax,rax;clear out rax register for calculating the LBA into
     push rcx ;save the counter for root directorty entries  
+    xor rcx,rcx
     mov ax, word[rdi + 0x003a] ;read in the disk start cluster of file 
     
     call calc_lba ;call lba calculation function 
     push rax ;save LBA in EAX 
     xor edx,edx ;clear dx for division
 
-    mov ax, word[rdi + 0x003c]
-    mov cx, 0x0200
-    div cx
-    mov cx,ax
+    mov eax, dword[rdi + 0x003c]
+    mov ecx, 0x0200
+    div ecx
+    mov ecx,eax
 
     cmp dx,0x00
     je no_round 
 
 round:
-    inc cx ;round cx up by one  
+    inc ecx ;round cx up by one  
 
 no_round:
     pop rax
-    push rax
     mov dx,[rbx+ATA_REGS]
-    push rdi ;save rdi 
+    push rdi 
     push rbx
-    mov bl, 11100000b
+    mov bl, 01000000b
     mov rdi, 0x10000 ;where to begin loading the kernel.
     call ata_read
-    
-    pop rbx
-    
-    ;	TODO:
-    ;	Add a method to verify the kernel executeable. 
-    ;	Either using the multiboot 2 standard or my own 
-    ;	signature though I'm leaning towards MB2 standard
-    ;	as that allows users to use grub and other
-    ; 	multiboot compatiable bootloaders by default with 
-    ;	no extra work needed
 
-    mov rax,qword[0x10000]
-    mov rdi,rax
-    mov rbx,0xb8000
-    call print_reg
-    jmp $
+
+kernel_verify:
+    xor rbx,rbx
+    xor rcx,rcx
+    xor rax,rax
+
+elf_file:
+    mov rbx,qword[0x10000] ;check it's even an elf file
+    cmp ebx, 0x464c457f ;check for the elf signature 
+    jne next_entry ;if it's not there bail 
+
+elf_type:
+    mov bx,word[0x10010] ;elf type offset
+    cmp bx,0x0002 ;check if kernel is an elf executeable
+    jne next_entry ;if it is not move onto the next file 
+
+machine_arch:
+    mov bx,word[0x10012] ;read in the machine arch
+    cmp bx,0x003e ;check if elf is x86_64 type
+    jne next_entry ;if it's not don't run it 
+
+program_header:
+    mov rbx,qword[0x10020] ;get the program header offset from elf header
+    mov eax,dword[0x10000+rbx]
+    cmp eax,0x00000001
+    jne next_program_header
+
+    mov rdi,qword[0x10008+rbx] ;move the program LOAD offset into rdi
+    add rdi,0x10000 ;add location where kernel was loaded into
+
+boot_signature:
+    mov eax,0xcafebabe ;check boot signature 
+    cmp eax,dword[rdi] ;if it exists at the start of .text 
+    jne next_entry 
+    add rdi,0x10 
+    push rdi ;fabricate a address to return to 
+    ret ;"return" to our kernel
 ;
 ;
-;
+next_program_header:
+    inc cx
+    cmp cx,word[0x10038]
+    jge next_entry
+    add bx,word[0x10036]
+    jmp program_header 
+
 next_entry:
     pop rbx ;restore rbx
     pop rdi ;restore rdi 
@@ -195,12 +223,3 @@ pcientry: dd 0x00
 
 SIGNATURE: db 0x55, 0xaa ;This is here as sort of signature
 
-section .bss
-align 4096 
-
-p4_table:
-    resb 4096
-p3_table: 
-    resb 4096
-p2_table:
-    resb 4096

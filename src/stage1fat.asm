@@ -100,13 +100,13 @@ real_start:
     mov bx, 0x8000 ;address to load bx at
     push eax ;Push the LBA address on to the stack to keep it safe
     
-    xor dx,dx ;Clear out DX as it's important that it equals zero
+    xor edx,edx ;Clear out DX as it's important that it equals zero
     
     ;Calculate the size of the stage2 file
-    mov ax, word[di + 0x003c] ;Read in a word of the size 
-    mov cx, 0x0200 ;move 512 bytes into ecx  
-    div cx ;Divide 
-    mov cx,ax ;move the result into the cx register
+    mov eax, dword[di + 0x003c] ;Read in a word of the size 
+    mov ecx, 0x0200 ;move 512 bytes into ecx  
+    div ecx ;Divide 
+    mov ecx,eax ;move the result into the cx register
     
     cmp dx, 0x00 ;if remainder of divide is 0
     je no_round ;dont round up just skip to no_round

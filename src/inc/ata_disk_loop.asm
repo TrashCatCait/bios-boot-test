@@ -40,10 +40,14 @@ ata_statuses:
     mov rsi,ata_bus
     mov byte[rsi+4],cl 
     add byte[rsi+4],0x30 ;print bus number 
+    
     push rax ;save rax as print_lm modifies it
+    push rcx
     call print_lm
     
+    pop rcx
     pop rax ;restore rax
+    
     push rbx ;annoying I have to use bx for this buffer 
     mov rbx,rax ;move rax into rbx  
     mov rdx,[ATA_REGS+rbx] ;get the ATA Bus we want to read 
@@ -53,7 +57,7 @@ ata_statuses:
     add dx,7 ;point dx to the status register
     in al,dx ;read in the status register 
     mov rdi,rax
-    push rcx ;save RCX 
+    push rcx
     call print_reg
 
     pop rcx ;restore rcx as print_reg modifies it 

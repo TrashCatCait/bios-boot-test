@@ -139,23 +139,45 @@ ata_read:
     inc dx ;Command port
     mov al,0x24 ;Read Extended 
     out dx,al ;send command
+
+pop rcx
+mov rbx,rcx
+
 .buffer_service:
     in al,dx
     test al,0x01 
     jnz .error
     test al,0x08 ;DRQ bit set?
     jz .buffer_service ;until the sector buffer is ready.
-    pop rcx
-    mov rax, 0x100 ;0x100 = 256 words half of a sector 
-    
-    push dx ;save dx as it's over written by mul 
-    mul cx ;Multiply this by the sector count to read 
-    mov rcx, rax ;Move result into times to repeat
-    pop dx  ;restore DX 
-    
+    jnz .data_ready
+
+.loop:
+    in al, dx		
+    test al, 0x80
+    jnz short .loop ;if l busy set loop back 
+    test al, 0x21 ;if Error bits are set 
+    jnz short .failure ;goto failure 
+
+;
+;This was changed due to a bug where only checking the disk status once and then 
+;loading in the all the sectors at once lead to bug. where the buffer would load
+;one sector fine at the correct memory address then all consective sectors
+;would just be filled with 0x0000 
+;That appears to have been fixed by reading one sector at a time. My guess would
+;be that I was reading to fast and the CPU kept reading data to fast for the disk
+;thus leading to this error
+;
+
+.data_ready:
+    mov rcx, 0x0100
     sub dx, 7 ;set DX to data port of the drive
     rep insw ;read in a single word to [rdi] 
-    jmp ata_read.done
+    add dx, 7 ;point back to status service
+    dec bx
+    test bx,bx
+
+    jne .loop
+    jmp .done
 
 ;if read fails set the carry flag and return
 .error:
