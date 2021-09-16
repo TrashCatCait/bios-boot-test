@@ -28,6 +28,34 @@ stage2_start:
     sti
     
     call enableA20
+    
+    
+    xor ax,ax
+    mov es,ax
+    push es 
+    mov ax, 0x1130
+    mov di,charmap
+    mov bh,6
+    int 0x10 
+
+    push es  
+    pop ds
+    pop es
+    mov si,bp
+    mov cx, 256*16/4
+    rep movsd
+    
+    xor ax,ax
+    mov ds,ax
+    mov es,ax
+
+    ;do this as the last thing
+    ;as potentially want to use textmode prints until 32-bit.
+    ;Where we swap to 320x200 with 256 colors 
+    ;But we want to swap in BIOS for simplicity.
+    mov ax, 0x0013
+    int 0x10 
+
     jmp load_protected
     
 %include './inc/a20.asm'
@@ -47,10 +75,15 @@ protected_start:
     mov ebp, 0x90000 ;stack here so it grows away from VGA video memory 
     mov esp, ebp
     
+    xor edi,edi
+    call clear_scr 
+    
+    mov edi,0xa0000
     call checkcpuid
     call enable_paging
     jmp load_long
 
+%include './inc/gui32.asm'
 %include './inc/cpuid.asm'
 %include './inc/gdt64.asm'
 %include './inc/paging.asm'
@@ -65,15 +98,11 @@ long_start:
     mov gs, ax
     mov ss, ax
     
-    mov rbp, 0x90000
+    mov rbp, 0x90000 ;restore the stack and base pointer to 0x90000 
     mov rsp, rbp
-    
-    mov eax,0x000b8000
-    call set_cur
-    call clear_screen ;clear the screen
-    call load_idt ;load and enable our IDT this is useless rn. I hope in the future
-    ;I can add interupts for reading from disks.
-    
+
+    xor rdi,rdi
+    call clear_scr64
     xor rbx,rbx
     jmp read_ata_disks
 
@@ -82,8 +111,8 @@ long_start:
 ;but this is nice and simply for testing. 
 found_mbr:
     mov rsi,same 
-    mov rbx,0xb8000
-    call print_lm ;print disk found string
+    mov rdi,0xa0000
+    call print_gui64 ;print disk found string
 
 ;we assume FAT root sector is loaded at 0x800 
 ;need to clean this up so that it's more intellegient in future but
@@ -156,8 +185,9 @@ boot_signature:
     cmp eax,dword[rdi] ;if it exists at the start of .text 
     jne next_entry 
     add rdi,0x10 
-    push rdi ;fabricate a address to return to 
-    ret ;"return" to our kernel
+    push rdi ;fabricate a address to "return" to 
+    mov rdi,framebuffer
+    retq ;"return" to our kernel
 ;
 ;
 next_program_header:
@@ -188,7 +218,7 @@ hltloop:
 %include './inc/pci.asm'
 %include './inc/print_64.asm'
 %include './inc/ata_read64.asm';
-
+%include './inc/gui64.asm'
 ;
 ;Data
 ;
@@ -197,6 +227,13 @@ dw 0x01f0
 dw 0x0170
 dw 0x01e8
 dw 0x0168
+
+framebuffer:
+dq 0x00000000000a0000 ;buffer base 
+dq 64000 ;size of buffer
+dd 320 
+dd 200
+dd 200
 
 same: db "Disk Confirmed", 0x00
 readerr: db "Disk read error", 0x00
@@ -214,6 +251,9 @@ pciminver: db 0x00
 pcimaxbus: db 0x00
 pcistring: dd 0x00
 pcientry: dd 0x00
+charmap:
+times 0x1000 db 0x00
+charmap_end:
 
 
 ;NO LONGER NEEDED

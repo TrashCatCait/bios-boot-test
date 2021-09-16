@@ -22,6 +22,7 @@ enable_paging:
     add edi, 8
     loop .identity_paging
 
+
     mov eax, cr4
     or eax, 1 << 5
     mov cr4, eax
