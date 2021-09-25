@@ -10,7 +10,7 @@ LFLAGS=--nostdlib
 
 #Files 
 MBRFILES=$(wildcard stage1/*.asm)
-MBRBIN=$(patsubst stage1/%.asm, %.bin, $(ASMFILES))
+MBRBIN=$(patsubst stage1/%.asm, %.bin, $(MBRFILES))
 CTARGET=stage.elf
 CFILES=$(wildcard stage2/*.c)
 COBJS=$(patsubst stage2/%.c, build/%.o, $(CFILES))
@@ -18,7 +18,7 @@ COBJS=$(patsubst stage2/%.c, build/%.o, $(CFILES))
 
 all: $(CTARGET) $(MBRBIN)
 
-%.bin: ./src/%.asm
+%.bin: ./stage1/%.asm
 	$(ASM) $(ASMFLAGS) -I./src $^ -o $@
 
 $(CTARGET): build $(COBJS) 
