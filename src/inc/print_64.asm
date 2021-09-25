@@ -26,9 +26,7 @@ print_lm:
 ;
 ; 
 ;
-
 print_reg:
-    
     xor rax,rax
     mov ecx,16
     lea rdx, [hex_ascii]

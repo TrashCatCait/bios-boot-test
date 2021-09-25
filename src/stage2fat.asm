@@ -184,10 +184,11 @@ boot_signature:
     mov eax,0xcafebabe ;check boot signature 
     cmp eax,dword[rdi] ;if it exists at the start of .text 
     jne next_entry 
-    add rdi,0x10 
-    push rdi ;fabricate a address to "return" to 
+    add rdi,0x10
+    push rdi
     mov rdi,framebuffer
-    retq ;"return" to our kernel
+    mov rsi,bootinfo
+    retq
 ;
 ;
 next_program_header:
@@ -235,6 +236,11 @@ dd 320
 dd 200
 dd 200
 
+bootinfo:
+db "E820"
+dq memorymap 
+dq charmap
+
 same: db "Disk Confirmed", 0x00
 readerr: db "Disk read error", 0x00
 verifyerror: db "Unable to find ATA devices or data, please report to developer.", 0x00
@@ -255,7 +261,9 @@ charmap:
 times 0x1000 db 0x00
 charmap_end:
 
+memorymap:
 
+memorymap_end:
 ;NO LONGER NEEDED
 ;At the moment the bootloader has to be divsiable by 512
 ;So my solution 512*number of sectors minus 2

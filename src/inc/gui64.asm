@@ -108,3 +108,79 @@ print_gui64:
 
     .done: 
     retq
+
+draw_char:
+    mov rcx, 16 ;else move 16 into rcx 
+    mul rcx ;rax = rax * rcx
+    mov rbx, rax ;mov result into rbx 
+    add rbx, charmap ;add charmap offset to result 
+    ;ebx now points to character font for that letter
+    
+    push qword 16 ;push 16 to stack 
+
+    .row_loop:
+    mov rcx,8 ;mov 8 into rcx
+    mov al,byte[rbx] ;move byte from [rbx] into al 
+    inc rbx ;increase rbx 
+
+    .bit_loop:
+    dec rcx ;decrease rcx by one 
+    bt ax,cx ;text cx bit of ax 
+    jnc .next_bit ;if it's not set jump to next bit 
+
+    .write_pixel: 
+    push ax ;save ax 
+    mov byte[rdi], 0x0f ;print fg color 
+    pop ax ;restore ax 
+    
+    .next_bit: 
+    add rdi, 1 ;add one byte to frambuffer pointer 
+    cmp rcx, 0x00 ;check if we are on bit zero 
+    jnz .bit_loop ;if it's not begin again 
+
+    pop rcx ;restore counter from stack 
+    dec rcx ;decrease rcx by one 
+    jz .next_char_setup ;if zero begin again 
+    
+    push rcx ;if not save rcx onto stack again 
+    add rdi,320 ;go down a row 
+    sub rdi,8 ;take away one char width 
+    jmp .row_loop
+
+    .next_char_setup:
+    sub edi,320 * 15 ;set up to print next char by returning to first scan line 
+    jmp .done
+
+    .done:
+    xor rax,rax
+    retq
+
+
+print_reg_gui:
+    xor rax,rax
+    mov rcx,16
+    lea rdx,[hex_ascii]
+
+.loop:
+    rol rdi,4
+    mov al,dil
+    and al,0x0f
+    mov al,byte[hex_ascii+rax]
+    
+    push rcx 
+    push rdi 
+    push rax 
+    mov rax, 0x10
+    mul rcx 
+    mov rdi, 0xa0000
+    add rdi,rax 
+    pop rax
+    call draw_char
+    pop rdi
+    pop rcx
+    
+    dec rcx
+    jnz .loop
+
+.exit:
+    ret
