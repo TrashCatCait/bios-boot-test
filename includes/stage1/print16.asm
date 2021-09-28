@@ -4,6 +4,7 @@ print_str:
 str_loop:
     lodsb ;load single byte into al
     cmp al, 0x00 ;check if al = 0 
+    mov bl, 0x0f
     je str_end ;goto string end 
     int 0x10 ;call interupt
     jmp str_loop ;loop again 

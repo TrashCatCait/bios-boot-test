@@ -107,7 +107,8 @@ check_vbr:
     jne vbr_error 
     cmp word[0x0600],0x0000
     je vbr_error 
-    mov dl,[bp]    
+    mov dl,[bp]
+    mov edi,dword[bp+0x08]
     jmp 0x0600 
 
 jmp $
