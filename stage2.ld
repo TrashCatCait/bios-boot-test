@@ -1,7 +1,8 @@
 OUTPUT_FORMAT(elf32-i386)
-ENTRY(main) 
+ENTRY(_start) 
 
-SECTIONS {    
+SECTIONS {
+    . = 0x11000;
     .text : ALIGN(0x1000)
     {
 	*(.text)

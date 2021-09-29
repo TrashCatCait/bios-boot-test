@@ -80,13 +80,104 @@ load_inode_tbl:
     mov dl,byte[disk]
     call read_disk
 
-    mov eax,dword[0x3100]
-    mov al,ah
-    mov ah,0x0e
-    mov bl,0x0f
-    int 0x10
+load_root_dir:
+    mov eax,dword[0x313c]
+    xor edx,edx
+    mov ecx,1024
+    mul ecx
+    xor edx,edx
+    mov ecx,512 
+    div ecx
+
+    mov edi,dword[part_offset]
+    add edi,eax 
+    xor ax,ax
+    mov bx,0x8000
+    mov cx,0x02
+    mov dl,byte[disk]
+    call read_disk
+
+    mov si,0x8018 ;first file in the dir that isn't . or ..
+
+    mov cx,0x10 
+next_file: ;loop through root dir till we find the file we want.
+    push cx
+    mov cl,byte[si + 6] ;cl = file name length 
+    xor ax,ax
+    xor dx,dx
+
+check_str:
+    mov bx,cx
+    mov al,byte[si + 8 + bx]
+    mov dl,byte[stage2name + bx]
+    
+    cmp ax,dx
+    jne not_equal
+    
+    loop check_str
+
+    cmp ax,dx
+    je stage2found
 
 
+not_equal:
+    pop cx 
+    dec cx
+    cmp cx,0x00
+
+    ;mov the si pointer forword one file
+    xor ax,ax
+    mov al,byte[si+6]
+    add ax,10 
+    add si,ax
+    
+    jne next_file
+    jmp nostage2
+    
+stage2found:
+    mov eax,dword[si]
+    dec eax
+    mov ecx,inodesper_group
+    xor edx,edx 
+    div ecx
+    
+    mov eax,edx
+    xor edx,edx 
+    mov ecx,0x100
+    mul ecx
+    mov ebx, eax
+
+    mov eax,dword[0x3000+bx+0x3c]
+    xor edx,edx
+    mov ecx,1024
+    mul ecx
+    xor edx,edx
+    mov ecx,512 
+    div ecx
+
+    mov edi,[part_offset]
+    add edi,eax 
+    xor ax,ax
+
+caculate_stage2sz:
+    xor edx,edx 
+    mov eax,[0x3000+bx+4] ;move the size of the inode in bytes into eax
+    mov ecx,512 ;move the size of a sector into ecx
+    div ecx ;size of inode / size of sector 
+
+    cmp edx,0 ;compare edx register to 0
+    je no_round ;if it is skip rounding up 
+
+    inc eax ;else round up by one
+
+no_round:
+    mov cx,ax ;move result into cx for sectors to load 
+    mov ax,0x1000 ;load this into segement 1 this gives us from 
+    ;0x10000 to 0x1ffff to load stage 2 in giving stage 2 a 
+    ;therotical max size of 64kb
+    mov dl,byte[disk]
+    xor bx,bx 
+    call read_disk
     
 load_gdt:
     lgdt [gdtr32]
@@ -94,6 +185,8 @@ load_gdt:
     or eax, 1 ;set bit one 
     mov cr0, eax ;put it back
     jmp code32:pmode_start ;jumpt to 32bit code 
+
+nostage2:
 
 loop_end:
     cli
@@ -113,7 +206,7 @@ loop_end:
 desc_count: dd 0 
 disk: db 0x00 
 part_offset: dd 0x0
-
+stage2name: db "stage2.elf", 0x00
 ;
 ; include data
 ;
@@ -133,7 +226,8 @@ pmode_start:
     mov gs,ax
     mov esp,0x90000
 
-    jmp $
+    push framebuffer
+    jmp 0x11000
 
 ;
 ; 32-bit code includes
@@ -143,6 +237,12 @@ pmode_start:
 ;
 ; 32-bit data section 
 ;
+framebuffer:
+dd 0xa0000
+dw 200
+dw 320
+dd 64000 
+dd 320
 
 times 1022 - ($-$$) db 0x00
 db 0x55, 0xaa

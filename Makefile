@@ -2,7 +2,7 @@ include ./Makefile.var
 
 #Compilers and set ups
 ASM=nasm 
-ASMFLAGS=-i./includes/ -fbin -w+all -w+error 
+ASMFLAGS=-i./includes/ -w+all -w+error 
 CC=clang
 CFLAGS=-I./includes/ -ffreestanding -nostdlib -mno-sse -mno-sse2 -mno-mmx -mno-red-zone -m32 
 LD=ld.lld
@@ -13,18 +13,23 @@ MBRFILES=$(wildcard stage1/*.asm)
 MBRBIN=$(patsubst stage1/%.asm, %.bin, $(MBRFILES))
 CTARGET=stage2.elf
 CFILES=$(wildcard stage2/*.c)
-COBJS=$(patsubst stage2/%.c, build/%.o, $(CFILES))
+COBJS=$(patsubst stage2/%.c, build/%.co, $(CFILES))
+ASMFILES=$(wildcard stage2/*.asm)
+ASMOBJS=$(patsubst stage2/%.asm, build/%.ao, $(ASMFILES))
 
 
-all: $(CTARGET) $(MBRBIN)
+all: build $(ASMOBJS) $(CTARGET) $(MBRBIN) 
 
 %.bin: ./stage1/%.asm
-	$(ASM) $(ASMFLAGS) -I./src $^ -o $@
+	$(ASM) $(ASMFLAGS) -fbin -I./src $^ -o $@
 
-$(CTARGET): build $(COBJS) 
-	$(LD) $(LFLAGS) -T./stage2.ld -o $@ $(COBJS)
+$(CTARGET): $(COBJS) 
+	$(LD) $(LFLAGS) -T./stage2.ld -o $@ $(ASMOBJS) $(COBJS)
 
-build/%.o: stage2/%.c
+build/%.ao: stage2/%.asm
+	$(ASM) $(ASMFLAGS) -felf32 $^ -o $@
+
+build/%.co: stage2/%.c
 	$(CC) $(CFLAGS) -c $^ -o $@
 
 build:
