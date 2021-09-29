@@ -1,7 +1,12 @@
 [bits 16]
 [org 0x600]
 
-%define charmap 0x1000
+%define charmap 0x8000
+%define inodeaddr 0xa000
+%define bgdaddr 0x9000 
+%define rootdir 0xb000
+%define memorymap 0xd000
+
 ;
 ; 16-bit code
 ;
@@ -21,6 +26,8 @@ init_cs:
     mov byte[disk],dl
     mov dword[part_offset],edi 
 
+    call do_e820
+
 rip_vga_fonts: 
     push ds ;save original ds 
     push es ;save es = 0 onto stack
@@ -31,7 +38,7 @@ rip_vga_fonts:
     pop ds ;ds = segement of video font 
     pop es ;restore es to zero 
     mov si,bp ;move offset of segement into si
-    mov di,0x1000 ;move destination index here
+    mov di,charmap ;move destination index here
     mov	cx,256*16/4 ;number of times to copy
     rep movsd ;move all fonts from ds:si to es:di
     pop ds ;restore ds 
@@ -58,13 +65,13 @@ load_bgd:
     mov edi,dword[part_offset];LBA to load 
     add edi,4
     mov ax,0x0000 ;segement to load to 
-    mov bx,0x2000 ;where to load data to
+    mov bx,bgdaddr ;where to load data to
     mov cx,0x02 ;sectors to load 
     mov dl,byte[disk]
     call read_disk
     
 load_inode_tbl:
-    mov eax,dword[0x2008]
+    mov eax,dword[bgdaddr + 8]
     mov ecx, 1024
     mul ecx 
     mov ecx, 512 ;Take in the block address of the inode table
@@ -74,14 +81,14 @@ load_inode_tbl:
     mov edi,dword[part_offset]
     add edi,eax
     xor ax,ax
-    mov bx,0x3000
+    mov bx,inodeaddr 
     mov cx,0x0008 ;load in 8 sectors, 4 blocks, 4096 bytes 16 inode entries 
-    ;so 0x3000 - 0x4000 equals the first 16 inode entries 
+    ;so 0xa000 - 0xb000 equals the first 16 inode entries 
     mov dl,byte[disk]
     call read_disk
 
 load_root_dir:
-    mov eax,dword[0x313c]
+    mov eax,dword[inodeaddr + 0x13c]
     xor edx,edx
     mov ecx,1024
     mul ecx
@@ -92,12 +99,12 @@ load_root_dir:
     mov edi,dword[part_offset]
     add edi,eax 
     xor ax,ax
-    mov bx,0x8000
+    mov bx,rootdir
     mov cx,0x02
     mov dl,byte[disk]
     call read_disk
 
-    mov si,0x8018 ;first file in the dir that isn't . or ..
+    mov si,rootdir + 0x18 ;first file in the dir that isn't . or ..
 
     mov cx,0x10 
 next_file: ;loop through root dir till we find the file we want.
@@ -147,7 +154,7 @@ stage2found:
     mul ecx
     mov ebx, eax
 
-    mov eax,dword[0x3000+bx+0x3c]
+    mov eax,dword[inodeaddr+bx+0x3c]
     xor edx,edx
     mov ecx,1024
     mul ecx
@@ -161,7 +168,7 @@ stage2found:
 
 caculate_stage2sz:
     xor edx,edx 
-    mov eax,[0x3000+bx+4] ;move the size of the inode in bytes into eax
+    mov eax,[inodeaddr+bx+0x04] ;move the size of the inode in bytes into eax
     mov ecx,512 ;move the size of a sector into ecx
     div ecx ;size of inode / size of sector 
 
@@ -199,6 +206,7 @@ loop_end:
 %include './stage1/a20.asm'
 %include './stage1/readdisk.asm'
 %include './stage1/print16.asm'
+%include './stage1/e820.asm'
 
 ;
 ; 16-bit Data
@@ -226,23 +234,27 @@ pmode_start:
     mov gs,ax
     mov esp,0x90000
 
-    push framebuffer
+    push dword mmap_ptr
+    push dword framebuffer
     jmp 0x11000
-
-;
-; 32-bit code includes
-;
-%include './stage1/print32.asm'
 
 ;
 ; 32-bit data section 
 ;
 framebuffer:
-dd 0xa0000
+dq 0xa0000
 dw 200
 dw 320
 dd 64000 
 dd 320
+dd 0x00
+
+mmap_ptr:
+dw 0x0000 ;The number of memory entries
+db 0x18 ;size of each entry
+db "E820" ;type of map used
+dq 0xd000 ;ptr to where the memory entries are 
+
 
 times 1022 - ($-$$) db 0x00
 db 0x55, 0xaa

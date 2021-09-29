@@ -9,10 +9,7 @@
 ; bx = where to load data
 ;;
 read_disk:
-    push ax
-    push dx
-    push cx
-    push bx
+    pusha
     push edi 
 check_disk_ext:
     mov ah, 0x41 ;Function number for check extentions
@@ -27,11 +24,7 @@ check_disk_ext:
 disk_read_ext:
     call disk_reset 
     pop edi 
-    pop bx
-    pop cx
-    pop dx
-    pop ax
-
+    popa
 
     push dword 0 ;push upper 32LBA bits
     push dword edi ;push lower 32LBA bits
@@ -42,7 +35,6 @@ disk_read_ext:
    
     
     mov ah,0x42
-    mov dl,byte[disk]
     
     mov si,sp
 
@@ -60,11 +52,11 @@ disk_read_ext:
 disk_read_no_ext:
     call disk_reset
     pop edi 
-    pop bx
-    pop cx
-    pop dx
-    pop ax    
     
+converLBA:
+    pop edi
+    popa
+
     jmp read_error
 
     ret
@@ -82,5 +74,8 @@ disk_reset:
     jc disk_reset ;if an error happended reset the disk again 
     ret ;return 
 
+abs_sec: db 0x00
+abs_head: db 0x00 
+abs_cyi: db 0x00 
 disk_error: db "Disk Err", 0x00 ;4 
 

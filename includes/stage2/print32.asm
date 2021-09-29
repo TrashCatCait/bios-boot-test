@@ -3,6 +3,19 @@
 ;
 ; GUI printing functions 
 ;
+clear_scr:
+    call put_pixel32 
+    mov al, byte[guibg]
+    add edi, 0x01
+    cmp edi,64000 
+    jnge clear_scr
+    ret
+
+put_pixel32:
+    mov byte[0x000a0000+edi],al ;move value of al to framebuffer at offset edi
+    ret
+
+
 
 print_gui32:
     .char_loop:
@@ -24,7 +37,7 @@ print_gui32:
     mov ecx, 16 ;else move 16 into ecx 
     mul ecx ;eax = eax * ecx
     mov ebx, eax ;mov result into ebx 
-    add ebx, charmap ;add charmap offset to result 
+    add ebx, 0x8000 ;add charmap offset to result 
     ;ebx now points to character font for that letter
     
     push dword 16 ;push 16 to stack as thats the character height
