@@ -39,7 +39,6 @@ do_e820:
 	jne short .e820lp
 .e820f:
 	mov word[mmap_ptr], bp	; store the entry count
-	clc			; there is "jc" on end of list to this point, so the carry must be cleared
 	ret
 .failed:
 	stc			; "function unsupported" error exit

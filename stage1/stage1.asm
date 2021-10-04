@@ -49,8 +49,8 @@ init_video:
     int 0x10 ;call interupt to set video mode
 
     xor edx,edx ;empty out division register 
-    mov eax,inode_count ;mov inode count into arthemitc reg 
-    mov ecx,inodesper_group ;mov inodes per group into count reg 
+    mov eax,dword[inode_count] ;mov inode count into arthemitc reg 
+    mov ecx,dword[inodesper_group];mov inodes per group into count reg 
     div ecx ;eax /ecx
     cmp edx,0x00 ;check for a remainder 
     je no_rounding ;if there isn't one skip rounding 
@@ -67,7 +67,6 @@ load_bgd:
     mov ax,0x0000 ;segement to load to 
     mov bx,bgdaddr ;where to load data to
     mov cx,0x02 ;sectors to load 
-    mov dl,byte[disk]
     call read_disk
     
 load_inode_tbl:
@@ -84,7 +83,6 @@ load_inode_tbl:
     mov bx,inodeaddr 
     mov cx,0x0008 ;load in 8 sectors, 4 blocks, 4096 bytes 16 inode entries 
     ;so 0xa000 - 0xb000 equals the first 16 inode entries 
-    mov dl,byte[disk]
     call read_disk
 
 load_root_dir:
@@ -101,12 +99,12 @@ load_root_dir:
     xor ax,ax
     mov bx,rootdir
     mov cx,0x02
-    mov dl,byte[disk]
     call read_disk
 
     mov si,rootdir + 0x18 ;first file in the dir that isn't . or ..
 
-    mov cx,0x10 
+    mov cx,0x10
+
 next_file: ;loop through root dir till we find the file we want.
     push cx
     mov cl,byte[si + 6] ;cl = file name length 
@@ -123,28 +121,25 @@ check_str:
     
     loop check_str
 
-    cmp ax,dx
     je stage2found
 
 
 not_equal:
-    pop cx 
-    dec cx
-    cmp cx,0x00
-
+    pop cx ;pop cx off the stack 
+    dec cx ;decrement by one 
+    jz nostage2 ;if it equals 0 jump to nostage2 
     ;mov the si pointer forword one file
-    xor ax,ax
-    mov al,byte[si+6]
-    add ax,10 
-    add si,ax
+    xor ax,ax ;clean out ax register 
+    mov al,byte[si+6] ;mov length of file name into al 
+    add ax,10 ;add one file object in bytes to ax 
+    add si,ax ;add ax to si 
     
-    jne next_file
-    jmp nostage2
+    jmp next_file
     
 stage2found:
     mov eax,dword[si]
     dec eax
-    mov ecx,inodesper_group
+    mov ecx,[inodesper_group]
     xor edx,edx 
     div ecx
     
@@ -164,7 +159,6 @@ stage2found:
 
     mov edi,[part_offset]
     add edi,eax 
-    xor ax,ax
 
 caculate_stage2sz:
     xor edx,edx 
@@ -182,7 +176,6 @@ no_round:
     mov ax,0x1000 ;load this into segement 1 this gives us from 
     ;0x10000 to 0x1ffff to load stage 2 in giving stage 2 a 
     ;therotical max size of 64kb
-    mov dl,byte[disk]
     xor bx,bx 
     call read_disk
    
