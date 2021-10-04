@@ -4,7 +4,7 @@ include ./Makefile.var
 ASM=nasm 
 ASMFLAGS=-i./includes/ -w+all -w+error 
 CC=clang
-CFLAGS=-I./includes/ -ffreestanding -nostdlib -mno-sse -mno-sse2 -mno-mmx -mno-red-zone  
+CFLAGS=-I./includes/ -ffreestanding -fno-pic -mcmodel=large -nostdlib -mno-sse -mno-sse2 -mno-mmx -mno-red-zone  
 LD=ld
 LFLAGS=--nostdlib
 
@@ -25,6 +25,7 @@ all: build $(ASMOBJS) $(CTARGET) $(MBRBIN)
 
 $(CTARGET): $(COBJS) 
 	$(LD) $(LFLAGS) -T./stage2.ld -o $@ $(ASMOBJS) $(COBJS)
+	strip -s $@
 
 build/%.ao: stage2/%.asm
 	$(ASM) $(ASMFLAGS) -felf64 $^ -o $@

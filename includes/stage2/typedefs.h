@@ -12,9 +12,10 @@ typedef int int32_t;
 
 typedef unsigned long long uint64_t;
 typedef long long int64_t;
+typedef uint64_t size_t;
 
 typedef enum {
-    VGA_8bit_color, //Note this is pallet color regular 256 color https://www.fountainware.com/EXPL/vgapalette.png
+    VA_8bit_color, //Note this is pallet color regular 256 color https://www.fountainware.com/EXPL/vgapalette.png
 } pixel_formats;
 
 typedef struct {
@@ -22,8 +23,9 @@ typedef struct {
     uint16_t height; //height of resolution 
     uint16_t width; //width of resolution 
     uint32_t size; //size of the buffer in bytes 
-    uint32_t ppsl; // pixels per scan line
+    uint16_t ppsl; // pixels per scan line
     pixel_formats color_depth;
+    void *fontmap;
 }__attribute__((packed))framebuffer_t;
 
 typedef struct {

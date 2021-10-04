@@ -185,13 +185,10 @@ no_round:
     mov dl,byte[disk]
     xor bx,bx 
     call read_disk
-    
-load_gdt:
-    lgdt [gdtr32]
-    mov eax, cr0 ;move cr0 into eax 
-    or eax, 1 ;set bit one 
-    mov cr0, eax ;put it back
-    jmp code32:pmode_start ;jumpt to 32bit code 
+   
+    push dword mmap_ptr
+    push dword framebuffer
+    jmp 0x1000:1000
 
 nostage2:
 
@@ -215,39 +212,16 @@ desc_count: dd 0
 disk: db 0x00 
 part_offset: dd 0x0
 stage2name: db "stage2.elf", 0x00
-;
-; include data
-;
-%include './stage1/gdt32.asm'
 
 
-[bits 32]
-;
-; 32-bit code section 
-;
-pmode_start:
-    mov ax,data32 ;load in the kernel gdt data segement 
-    mov ds,ax ;set all the segement register to this value
-    mov es,ax
-    mov ss,ax
-    mov fs,ax
-    mov gs,ax
-    mov esp,0x90000
-
-    push dword mmap_ptr
-    push dword framebuffer
-    jmp 0x11000
-
-;
-; 32-bit data section 
-;
 framebuffer:
-dq 0xa0000
-dw 200
-dw 320
-dd 64000 
-dd 320
-dd 0x00
+dq 0xa0000 ;buffer address 
+dw 200 ;height in pixels 
+dw 320 ;width in px 
+dd 64000 ;size of buffer 
+dw 320 ;ppsl 
+dd 0x00 ;vga color pallet
+dq 0x8000 ;location of font 
 
 mmap_ptr:
 dw 0x0000 ;The number of memory entries
