@@ -93,7 +93,7 @@ isr33:
 ;generate rep number of entries
 isr_table:
 %assign i 0 
-%rep    33
+%rep    34
     dq isr%+i 
 %assign i i+1 
 %endrep
