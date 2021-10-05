@@ -1,3 +1,4 @@
+[bits 32]
 section .text 
     global isr_table
     extern exception_handler

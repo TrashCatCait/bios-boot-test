@@ -1,4 +1,4 @@
-[bits 64]
+[bits 32]
 section .text 
     global load_gdt
     global load_idt

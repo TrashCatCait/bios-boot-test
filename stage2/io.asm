@@ -1,13 +1,8 @@
-[bits 64]
+[bits 32]
 section .text 
-;
-;	all these functions should be called from C
-;	ARG1 = RDI
-;	ARG2 = RSI
-;	Return Value = RAX
-;
+
+
 out_byte:
-    mov dx,di ;mov lower 16 bits of RDI into dx to serve as port No.
     mov ax,si ;mov second arg aka data to send to port to ax
     out dx,al ;output byte(al) into port(dx)
     retq ;return to C code having send data

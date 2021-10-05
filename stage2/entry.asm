@@ -101,6 +101,7 @@ vesa_on: db 0 ;used to deterimine if Vesa is set up
 
 [bits 32]
 section .text
+extern main
 ;
 ;   Okay so this is a little funky because this is technically a
 ;   x86_64 elf executeable but we load in here at 32 bit then.
@@ -125,13 +126,6 @@ pmode_start:
     mov esp,0x90000
     
     call checkcpuid ;check the CPU is a 64bit CPU 
-    call enablepaging ;setup idenitity paging for the first two megabytes
-
-
-
-load_long:
-    lgdt [gdt64_pointer]
-    jmp 0x0008:long_start
 
 hltloop:
     cli
@@ -151,30 +145,4 @@ cpuiderr: db "cpuid not supported", 0x00
 longerror: db "long mode error",0x00
 bufferptr: dd 0x0000000
 mmap_ptr: dd 0x0000000 
-%include './stage2/gdt64.asm'
-
-
-[bits 64]
-section .text 
-extern stage2_start
-
-long_start:
-    cli
-    mov ax,0x10
-    mov es,ax
-    mov ds,ax
-    mov ss,ax
-    mov fs,ax
-    mov gs,ax
-    mov rsp,0x90000 ;reset the stack to 0x90000 just bellow the framebuffer 
-    
-    xor rdi,rdi ;clear the upper bits of the rdi(arg1) registers
-    xor rsi,rsi
-    mov esi,dword[mmap_ptr]
-    mov edi,dword[bufferptr] ;set the lower 32bits to the bufferptr value
-    ;essentially this in C
-    ;uint64_t framebuffer_ptr = (uint64 *) framebuffer32_ptr
-    ;now wehave a pointer to the framebufferstructure in 64bits
-
-    jmp stage2_start ;call C code 
 

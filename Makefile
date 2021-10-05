@@ -4,9 +4,9 @@ include ./Makefile.var
 ASM=nasm 
 ASMFLAGS=-i./includes/ -w+all -w+error 
 CC=clang
-CFLAGS=-I./includes/ -ffreestanding -fno-pic -mcmodel=large -nostdlib -mno-sse -mno-sse2 -mno-mmx -mno-red-zone  
+CFLAGS=-I./includes/ -ffreestanding -fno-pic -mcmodel=large -nostdlib -mno-sse -m32 -mno-sse2 -mno-mmx -mno-red-zone  
 LD=ld
-LFLAGS=--nostdlib
+LFLAGS=--nostdlib -static -z max-page-size=0x1000
 
 #Files 
 MBRFILES=$(wildcard stage1/*.asm)
@@ -28,7 +28,7 @@ $(CTARGET): $(COBJS)
 	strip -s $@
 
 build/%.ao: stage2/%.asm
-	$(ASM) $(ASMFLAGS) -felf64 $^ -o $@
+	$(ASM) $(ASMFLAGS) -felf32 $^ -o $@
 
 build/%.co: stage2/%.c
 	$(CC) $(CFLAGS) -c $^ -o $@
