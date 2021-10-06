@@ -33,9 +33,8 @@ void remap_pic(uint8_t moffset, uint8_t soffset) {
 void mask_pic(uint8_t mmask, uint8_t smask) {
     out_byte(PIC1_DATA,mmask);
     wait_io();
-
+    
     out_byte(PIC2_DATA,smask);
     wait_io();
 }
-
 

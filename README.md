@@ -10,6 +10,22 @@ This project is a MBR bootloader that will boot the VBR of any disk and execute 
 
 ___
 
+# How it works:
+### MBR/BIOS:
+On MBR we store stage 1 in the MBR, stage 2 is stored in the ~~EXT4 boot partition~~ 2047 sectors between the MBR and the disks first partition. Note: After some reading the old method is pointless as these sectors *should be* free to use and write anything to on a MBR disk and the only things that should cause conflicts is other boot loaders.
+
+We are going to create a field in the MBR called stage 2 LBA. That will be calculated at boot loader install time. Potentially this may need to be reconsider should it be shown that things such as defragmentation drives or boot loader sectors are frequently moving but this definetly shouldn't be an issue but we will see as time goes on I guess.
+
+### GPT/BIOS:
+On GPT we still use the previous method that I had planned for the MBR where we use a partition on the disk to store the stage 2 loader and the MBR will boot the sectors of that partition. This is done because the first 2047 sectors seem to actually be used in the GPT disk format as that appears to where the GPT disk partition table is stored. So we instead store the data in a partition on the disk.
+
+We do this as we don't want to interfere with the GPT partition tables and on GPT, partition waste isn't as big as a deal as it was on MBR where you can only have 4 primary partitions. As GPT can in theory support infinite partitions. But currently supports 128 partitions per disk. So one being used for the bootloader is not a big deal at all.
+
+### NOTE: 
+This bootloader works, with LBA address being read through BIOS interrupt `ah=0x42` int 0x13 or with a CHS value generated through getting the interrupt ah=0x08 disk parameters and converting the LBA address into a CHS value and reading it with interrupt ah=0x02. But please be aware, while this "works" on 32bit or lower LBA address it does not currently convert full 48bit addresses and will jump to disk error should the higher bytes be set and reading with LBA is unable to work for whatever reason. 
+
+However CHS only reads shouldn't make up much of the computer market at all. As LBA appears to predate the millinium from my research so the chance's of this are very low and any CHS only computers are likely running much older storage mediums that also likely have much smaller sizes. 
+
 # How To Build:
 
 So currently to build this project you simply need to either run the make file provided or run `nasm -fbin src/start.asm -o mbr.bin`. This will change as I start work on stage2 and so though. Please see listed tool versions below if errors are encountered while building.
@@ -64,7 +80,7 @@ ___
 # Branches
 
 - `Master` this branch is what I consider to be the up to date stable code and a good effort to make it bug free and working will always be taken. Along with giving me a clean empty branch to fall back on if I make a huge mistake on other branches.
-- `Unstable` like the name suggest this branch is where I push the most recent and unstable/untested code. There is less guarantees about this branch actually working but of course an effort will still be made to ensure it "works". But this branch will also reflect what I'm currently working on.
+- `Staging` like the name suggest this branch is where I push the most recent and unstable/untested code. There is less guarantees about this branch actually working but of course an effort will still be made to ensure it "works". But this branch will also reflect what I'm currently working on.
 
 ___
 

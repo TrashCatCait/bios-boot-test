@@ -2,7 +2,7 @@
 #include <stage2/typedefs.h>
 
 static uint8_t *buffer_base;
-static uint64_t size; 
+static uint32_t size; 
 static uint32_t width;
 static uint32_t height;
 static uint32_t ppsl;
@@ -16,7 +16,7 @@ void setup_bfr(framebuffer_t *fb) {
     width = fb->width;
     height = fb->height;
     ppsl = fb->ppsl;
-    font = fb->fontmap;
+    font =(uint8_t*) fb->fontmap;
 }
 
 void set_colors(uint8_t fg, uint8_t bg){
@@ -25,7 +25,7 @@ void set_colors(uint8_t fg, uint8_t bg){
 }
 
 void clear_scr() {
-    for(size_t index = 0; index < size; index++) {
+    for(uint32_t index = 0; index < size; index++) {
 	    buffer_base[index] = bg_color;
     }
 }
@@ -56,7 +56,7 @@ void putpixel(uint32_t x, uint32_t y, uint8_t color) {
 
 void draw_char8x16(char c, uint32_t x, uint32_t y) {
     uint32_t cx,cy;
-    int bitmask[8] = {128,64,32,16,8,4,2,1}; //masks for checking if bits set 
+    static const int bitmask[8] = {128,64,32,16,8,4,2,1}; //masks for checking if bits set 
     uint8_t *glyph = font+(int)c*16;
 
     for(cy = 0; cy < 16; cy++) {
@@ -77,4 +77,5 @@ void draw_str8x16(char *string, uint32_t x, uint32_t y) {
 	string++;
     }
 }
+
 

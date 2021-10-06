@@ -3,58 +3,75 @@ section .text
 
 
 out_byte:
-    mov ax,si ;mov second arg aka data to send to port to ax
-    out dx,al ;output byte(al) into port(dx)
-    retq ;return to C code having send data
-
-out_word:
-    mov dx,di ;mov lower 16 bits of RDI into dx to serve as port No.
-    mov ax,si ;mov second arg aka data to send to port to ax
-    out dx,ax ;output word(ax) into port(dx)
-    retq ;return to C code having send data
-
-out_dword:
-    mov dx,di ;mov lower 16 bits of RDI into dx to serve as port No.
-    mov eax,esi ;mov second arg aka data to send to port to ax
-    out dx,eax ;output dword(eax) into port(dx)
-    retq ;return to C code having send data
+    push ebp
+    mov ebp,esp
+    mov al,byte[ebp+0x0c]
+    mov dx,word[ebp+0x08]
+    out dx,al  
+    pop ebp
+    retn ;return to C code having send data
 
 in_byte:
-    mov dx,di ;move lower 16 bits of RDI into dx to serve as port No.
-    xor ax,ax ;clear out return register
-    in al,dx ;read in byte 
-    retq ;return byte to C code 
+    push ebp
+    mov ebp,esp
+    mov dx,word[ebp+0x08]
+    in al,dx 
+    pop ebp 
+    ret 
+
+out_word:
+    push ebp
+    mov ebp,esp
+    mov ax,word[ebp+0x0c]
+    mov dx,word[ebp+0x08]
+    out dx,al  
+    pop ebp
+    retn ;return to C code having send data
 
 in_word:
-    mov dx,di ;move lower 16 bits of RDI into dx to serve as port No.
-    xor ax,ax ;clear out return register
-    in ax,dx ;read in word 
-    retq ;return word to C code 
+    push ebp
+    mov ebp,esp
+    mov dx,word[ebp+0x08]
+    in ax,dx 
+    pop ebp 
+    ret 
+
+out_dword:
+    push ebp
+    mov ebp,esp
+    mov eax,dword[ebp+0x0c]
+    mov dx,word[ebp+0x08]
+    out dx,al  
+    pop ebp
+    retn ;return to C code having send data
 
 in_dword:
-    mov dx,di ;move lower 16 bits of RDI into dx to serve as port No.
-    xor eax,eax ;clear out return register
-    in eax,dx ;read in word 
-    retq ;return word to C code 
+    push ebp
+    mov ebp,esp
+    mov dx,word[ebp+0x08]
+    in eax,dx 
+    pop ebp 
+    ret 
 
 hlt_c:
     hlt 
-    retq 
+    ret 
 
 clear_interupts:
     cli  ;clear interupts(disable hardware interupts)
-    retq ;return to C code  
+    ret ;return to C code  
 
 set_interupts:
     sti  ;set interupts(enable hardware interupts)
-    retq ;return to C code 
+    ret ;return to C code 
 
 wait_io: 
-    push ax ;Save value of register 
+    push ebp
+    mov ebp,esp 
     xor al,al ;xor it 
     out 0x80, al ;out to 0x80
-    pop ax ;pop the original value 
-    retq
+    pop ebp
+    ret
 
 ;This function should never return 
 ;and should be used if an horrible error occurs that
@@ -79,4 +96,5 @@ global set_interupts
 global wait_io
 
 global kernel_hang
+
 

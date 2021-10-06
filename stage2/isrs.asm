@@ -1,44 +1,37 @@
 [bits 32]
 section .text 
     global isr_table
+    global load_idt
     extern exception_handler
     extern isr32_handler
     extern isr33_handler
     
     
-
-%macro pushaq 0
-    push rax
-    push rbx
-    push rcx
-    push rdx
-%endmacro
-
-%macro popaq 0
-    pop rax
-    pop rbx
-    pop rcx
-    pop rdx
-%endmacro
-
 %macro isr_err 1
 isr%+%1:
-    pushaq
-    mov rdi, %+%1
+    push ebp,
+    mov ebp,esp 
+    pushad
     call exception_handler 
-    popaq
-    iretq 
+    popad
+    mov esp,ebp 
+    pop ebp 
+    iretd
 %endmacro 
 
 %macro isr_no_error 1
 isr%+%1:
-    pushaq
-    mov rdi, %+%1
+    push ebp
+    mov ebp,esp 
+    pushad
     call exception_handler
-    popaq 
-    iretq 
+    popad
+    mov esp,ebp
+    pop ebp
+    iretd 
 %endmacro
 
+align 4
 ;
 ; currently exceptions that sends error codes and those that don't do the
 ; same actions but these are seperated in case I want to add different behaviour
@@ -79,23 +72,40 @@ isr_err 30
 isr_no_error 31
 
 isr32:
-    pushaq
+    push ebp,
+    mov ebp,esp 
+    pushad
     call isr32_handler
-    popaq
-    iretq
+    popad
+    mov esp,ebp 
+    pop ebp
+    iretd
 
 isr33:
-   pushaq
-   call isr33_handler
-   popaq
-   iretq
+    push ebp
+    mov ebp,esp 
+    pushad
+    call isr33_handler
+    popad
+    mov esp,ebp
+    pop ebp
+    iretd
 
 
 ;generate rep number of entries
 isr_table:
 %assign i 0 
 %rep    34
-    dq isr%+i 
+    dd isr%+i 
 %assign i i+1 
 %endrep
+
+load_idt:
+    push ebp
+    mov ebp,esp
+    mov edi,[ebp+8]
+    lidt [edi]
+    sti
+    pop ebp
+    ret
 
