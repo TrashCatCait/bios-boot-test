@@ -16,7 +16,7 @@ void setup_bfr(framebuffer_t *fb) {
     width = fb->width;
     height = fb->height;
     ppsl = fb->ppsl;
-    font =(uint8_t*) fb->fontmap;
+    font =(uint8_t*)fb->fontmap;
 }
 
 void set_colors(uint8_t fg, uint8_t bg){

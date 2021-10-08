@@ -1,9 +1,6 @@
 [bits 16]
 
 get_memmap:
-    push es
-    xor ax,ax
-    mov es,ax
     mov di,map_ptr+4 ;where we want to store our entries
     xor ebx,ebx ;ebx starts off as 0 
     xor bp,bp ;entry count stored in bp
@@ -45,7 +42,6 @@ get_memmap:
     jne .loop ;else loop back and grab another entry
 .done:
     mov word[es:di],bp ;store entry count at start of map 
-    pop es 
     ret 
 
 ;;

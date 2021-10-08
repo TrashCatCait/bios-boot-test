@@ -11,6 +11,9 @@ This project is a MBR bootloader that will boot the VBR of any disk and execute 
 ___
 
 # How it works:
+## BIOS NOTE:
+at the moment the bootloader attempts to match your monitors prefered resolution to a supported a VBE mode. This code currently isn't very robust as it requires an exact match and doesn't fall back to the next best mode but rather the VGA mode 0x13 (320x200) if it's unable to find a supported mode. Also it doesn't match the monitors refresh rates at the moment. This should all be getting added later.
+
 ### MBR/BIOS:
 On MBR we store stage 1 in the MBR, stage 2 is stored in the ~~EXT4 boot partition~~ 2047 sectors between the MBR and the disks first partition. Note: After some reading the old method is pointless as these sectors *should be* free to use and write anything to on a MBR disk and the only things that should cause conflicts is other boot loaders.
 

@@ -81,8 +81,8 @@ disk_read_ext:
     pop ax ;sector count to read really only al should have bytes set.
     push dword [stage2_lba+4];push the four higher bytes on to the stack
     push dword [stage2_lba];Push lower bytes on the stack
-    push word 0x1000 ;segement to load stage 2 at 
-    push word 0x0000 ;offset to load at 
+    push word 0x0000 ;segement to load stage 2 at 
+    push word 0x8000 ;offset to load at 
     push word ax ;sectors to read
     push word 0x0010 ;size of dap 
     
@@ -138,10 +138,8 @@ disk_read_no_ext:
     or [abs_sec],dl ;store the sector count 
     
     pop ax
-    mov bx,0x1000
-    mov es,bx 
-    xor bx,bx ;Where to load the VBR 
     mov dl, [disk] ;where we saved the BIOS disk number 
+    mov bx, 0x8000 ;load stage 2 in here
     mov dh, [abs_had] ;Partition head number 
     mov cl, [abs_sec] ;Partition sector number 
     mov ch, [abs_cyl] ;Partition cyliander number 
@@ -150,7 +148,11 @@ disk_read_no_ext:
     jc read_error ;if carry flag is set jump to read error 
     
 attempt_boot:
-    jmp 0x1000:0x1000
+    xor dx,dx 
+    mov dl,byte[disk]
+    mov di,word[0x8018]
+    jmp di
+
 
 disk_reset:
     xor ah,ah

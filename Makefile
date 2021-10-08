@@ -5,7 +5,7 @@ ASM=nasm
 ASMFLAGS=-i./includes/ -w+all -w+error 
 CC=clang
 CFLAGS=-I./includes/ -ffreestanding -fno-pic -nostdlib -mno-sse -m32 -mno-sse2 -mno-mmx -mno-red-zone  
-LD=ld.lld
+LD=ld
 LFLAGS=--nostdlib -static -z max-page-size=0x1000 
 
 #Files 
@@ -26,7 +26,7 @@ installer.elf: ./installer/*.c
 	$(ASM) $(ASMFLAGS) -fbin -I./src $^ -o $@
 
 $(CTARGET): $(COBJS) 
-	$(LD) $(LFLAGS) -T./stage2.ld -o $@ $(ASMOBJS) $(COBJS)
+	$(LD) $(LFLAGS) -T./stage2.ld -o $@ $(ASMOBJS) $(COBJS) -melf_i386
 
 build/%.ao: stage2/%.asm
 	$(ASM) $(ASMFLAGS) -felf $^ -o $@

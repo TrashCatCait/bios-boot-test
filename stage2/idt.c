@@ -1,3 +1,4 @@
+#include "stage2/framebuffer.h"
 #include <stage2/idt.h>
 #include <stage2/typedefs.h>
 #include <stage2/pic.h>
@@ -28,7 +29,7 @@ void init_idt() {
 
     idtDesc.size = sizeof(idt) - 1;
     idtDesc.offset = (uint32_t)&idt[0];
-
+    
     remap_pic(0x20, 0x28);
     mask_pic(0xfd,0xff);
     load_idt(&idtDesc);
