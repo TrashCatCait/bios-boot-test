@@ -78,4 +78,3 @@ void draw_str8x16(char *string, uint32_t x, uint32_t y) {
     }
 }
 
-

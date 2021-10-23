@@ -9,11 +9,11 @@ section .text
     
 %macro isr_err 1
 isr%+%1:
+    pop eax 
     push ebp,
-    mov ebp,esp 
-    pushad
+    mov ebp,esp
+    push eax 
     call exception_handler 
-    popad
     mov esp,ebp 
     pop ebp 
     iretd
@@ -21,11 +21,11 @@ isr%+%1:
 
 %macro isr_no_error 1
 isr%+%1:
+    xor eax,eax 
     push ebp
     mov ebp,esp 
-    pushad
+    push eax
     call exception_handler
-    popad
     mov esp,ebp
     pop ebp
     iretd 

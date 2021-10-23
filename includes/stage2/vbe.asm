@@ -10,7 +10,8 @@ setup_vesa:
     mov di,vbe_info
     int 0x10
     pop es
-
+    
+    mov bx,0x01 ;Error code 
     cmp ax,0x004f ;check ah for function fail bits and al for function supported
     jne .failed ;if not equal jump to failed check 
     
@@ -29,6 +30,7 @@ setup_vesa:
     mov [vid_off],si ;save si into here incase register gets trashed.
     mov word[cur_mode],cx ;save currently process mode
     
+    mov bx,0x02 ;Error code 
     cmp word[cur_mode],0xffff ;end of list 
     je .failed ;if yes goto fail 
     
@@ -39,6 +41,7 @@ setup_vesa:
     int 0x10 ;call interupt 
     pop es 
     
+    mov bx,0x03 ;error code 
     cmp ax,0x004f 
     jne .failed 
 
@@ -63,6 +66,7 @@ setup_vesa:
     int 0x10
     pop es
  
+    mov bx, 0x04 ;error code  
 	cmp ax, 0x004F ;check if the mode set successfully  
 	jne .failed ;if it didn't don't update the framebuffer information  
     
@@ -95,11 +99,20 @@ setup_vesa:
     jmp .loop_mode
 
 .failed:
+    push bx
     xor ax,ax
     mov gs,ax ;reset gs back to 0 
+    
     mov si,verror ;move error string into si 
     mov bl,0x0f ;color to print 
     call print_str ;call print string 
+    pop bx ;restore error code in bl
+    mov al,bl
+    add al,0x30 ;get ascii char from number 
+    mov ah,0x0e
+    mov bl,0x0f 
+    int 0x10
+
     xor ax,ax ;keboard wait for input number
     int 0x16 ;wait for keyboard input 
     stc
@@ -134,8 +147,8 @@ get_edid:
     ret
 
 section .data
-pref_y: dw 0x0000
-pref_x: dw 0x0000 
+pref_y: dw 0x300 
+pref_x: dw 0x400 
 bpp: db 0x08
 vid_off: dw 0x0000
 vid_seg: dw 0x0000 
