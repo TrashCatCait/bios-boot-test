@@ -1,10 +1,19 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;  BIOS MBR sector 0.                                ;
-; This MBR is intented to be used on a hard disk/usb ;
-; Please don't use it on a CD-ROM as they have 2048  ;
-; bytes per sector not 512 and this could lead to    ;
-; many errors                                        ;
+;  BIOS CD MBR sector 0.                             ;
+; This MBR is intented to be used on a CD/ROM Drives ;
+; This is mostly the same as the HDD bootloader as I ; 
+; found when testing the HDD bootloader could work in;
+; ISO files made with mkisofs. If I added byte 12 to ;
+; the LBA offset as that's zero in harddrive boots   ;
+; But it's mkisofs boot infos LBA offset in ISOs made;
+; with mkisofs so that did work for extended reads   ; 
+; but not for CHS as CHS auto assumes 512 in HDD boot;
+; and I use unable to find a way to get sector size  ;
+; other than extended drive parameters which isn't 
+; useful for CHS. As if we revet to CHS in there it 
+; means it isn't supported or an error occured.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 [bits 16]
 [org 0x7c00]
 
@@ -23,15 +32,16 @@
 _start:
     jmp after_bpb ;Jmp to after_bpb symbol 
     nop ;No operation 
+    
+    times 8-($-$$) db 0x00  ;pad with zero until eltorito boot table 
+    ;filled in by ISO creation tool 
+    bi_PrimVolDesc_LBA dd 0x0000 ;LBA of PVD of ISO
+    bi_MBR_LBA dd 0x0000 ;LBA of boot file should be this MBR
+    bi_MBR_LEN dd 0x0000 ;Length of the bootfile
+    bi_Checksum dd 0x0000 ;Check sum 
+    bi_Reserved times 40 db 0 
 
-    ;So according the Limine & GRUB bootloaders comments
-    ;Some bioses will overwrite the section where the fat BPB would be.
-    ;Potentially overwriting code if code is placed here. 
-    ;So we are now zeroing this out and jumping after the bpb
-    ;Slighlty annoying as I need to rework this bootloader.
-    ;as it previous code was to big to fit now we can't use the bpb
-    ;bytes - Cait.
-    times 87 db 0x00 
+    times 87-($-$$) db 0x00 ;Not sure if skip BPB matters with ISO booting but just in case
 
 after_bpb:
     cli ;clear interupts while we set up segement registers
@@ -45,14 +55,16 @@ set_cs:
     mov fs,ax
     mov gs,ax
     
-    cld ;clear the direction flag so *i registers grow upwards
-    
+    cld ;clear the direction flag so *i registers grow upwards 
     mov sp,0x7c00 ;stack grows down from here
     
     sti ;renable interupts
 
     mov byte[disk],dl ;save dl in [disk]
-    
+    mov eax,[bi_MBR_LBA]
+    add dword[stage2_lba],eax
+
+
 check_disk_ext:
     call disk_reset ;reset the disk to make sure its okay to use.
     mov ah,0x41 ;Function number for check extentions
@@ -155,7 +167,7 @@ disk_read_no_ext:
     
 calculate_sectors:
     mov ax,word[stage2_size] ;move the size of stage2 into ax 
-    mov cx,512 ;size of disk sector assume 512 
+    mov cx,2048 ;size of disk sector assume 512 
     xor dx,dx ;clear out remainder register
 
     div cx ;divide size by 512 
@@ -210,8 +222,13 @@ abs_had: db 0x00 ;calculated absolute head
 disk_error: db "Disk Err", 0x00 ;4 i
 ;constants of where the LBA and size of stage2 will be stored
 times 0x190-($-$$) db 0x00 ;Used to postition these values at an absolute locations 0x190(stage2 LBA) & 0x198(Stage2 Size)
-stage2_lba: dq 0x1c ;Default to LBA address 1(Sector 2) but fill out correctly at runtime
-stage2_size: dw 0x3190 ;stage 2 is limited to 64K in size
+stage2_lba: dq 0x01 ;Default to LBA address 1(Sector 2) but fill out correctly at runtime
+stage2_size: dw stage2_end - stage2 ;stage 2 is limited to 64K in size
 
-times 0x1fe-($-$$) db 0x00 ;pad with zeros to the 512 byte of the boot sector 
-db 0x55, 0xaa ;IBM BIOS Boot number 
+times 2048-($-$$) db 0x00 ;pad with zeros to the 512 byte of the boot sector 
+
+stage2:
+incbin '../stage2.elf'
+
+stage2_end:
+

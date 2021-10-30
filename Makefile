@@ -17,7 +17,8 @@ COBJS=$(patsubst stage2/%.c, build/%.co, $(CFILES))
 ASMFILES=$(wildcard stage2/*.asm)
 ASMOBJS=$(patsubst stage2/%.asm, build/%.ao, $(ASMFILES))
 
-all: build $(ASMOBJS) $(CTARGET) $(MBRBIN) installer.elf
+#Stage 2 comes first so it's present for MBR calculations
+all: build $(CTARGET) $(MBRBIN) installer.elf
 
 installer.elf: ./installer/*.c
 	$(CC) -fuse-ld=lld -o $@ $^
@@ -25,8 +26,9 @@ installer.elf: ./installer/*.c
 %.bin: ./stage1/%.asm
 	$(ASM) $(ASMFLAGS) -fbin -I./src $^ -o $@
 
-$(CTARGET): $(COBJS) 
+$(CTARGET): $(ASMOBJS) $(COBJS) 
 	$(LD) $(LFLAGS) -T./stage2.ld -o $@ $(ASMOBJS) $(COBJS) -melf_i386
+	llvm-strip --strip-all $@
 
 build/%.ao: stage2/%.asm
 	$(ASM) $(ASMFLAGS) -felf $^ -o $@
