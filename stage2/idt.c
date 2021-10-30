@@ -11,7 +11,6 @@ void idt_set_isr(idt32_entry_t *entry, void *isr, uint8_t flags) {
     entry->offset_mid = (uint32_t)isr >> 16;
     entry->kernel_cs = 0x08;
     entry->type_attr = flags;
-
 }
 
 void init_idt() {
@@ -22,8 +21,7 @@ void init_idt() {
     for(int vectors=0; vectors <= 256; vectors++) {
         idt_set_isr(&idt[vectors], 0x0000, 0x00);
     }
-    for(int vectors=0; vectors <= 33; vectors++) 
-    {
+    for(int vectors=0; vectors <= 33; vectors++) {
 	    idt_set_isr(&idt[vectors], isr_table[vectors], 0x8e);
     }
 

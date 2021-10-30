@@ -1,5 +1,5 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;   BIOS MBR sector 0.                               ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;  BIOS MBR sector 0.                               ;
 ; This MBR is intented to be used on a hard disk/usb ;
 ; Please don't use it on a CD-ROM as they have 2048  ;
 ; bytes per sector not 512 and this could lead to    ;
@@ -8,7 +8,6 @@
 [bits 16]
 [org 0x7c00]
 
-
 ; $$ - section start = org 0x7c00
 ; $ - current pos
 ; ($ - $$)
@@ -16,16 +15,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;        Definations        ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+%define disk_struct 0x0600
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;          MBR code         ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 _start:
-    jmp after_bpb
-    nop
+    jmp after_bpb ;Jmp to after_bpb symbol 
+    nop ;No operation 
 
-    ;So according the Limine bootloader comments
+    ;So according the Limine & GRUB bootloaders comments
     ;Some bioses will overwrite the section where the fat BPB would be.
     ;Potentially overwriting code if code is placed here. 
     ;So we are now zeroing this out and jumping after the bpb
@@ -54,19 +53,8 @@ set_cs:
 
     mov byte[disk],dl ;save dl in [disk]
     
-    mov ax,word[stage2_size]
-    mov cx,512
-    xor dx,dx ;clear out remainder register
-
-    div cx ;divide size by 512 ;we assume this is the sector size
-
-    cmp dx,0x00 
-    je check_disk_ext ;if remainder not set go straight to reading 
-    
-    inc ax 
-
 check_disk_ext:
-    push ax
+    call disk_reset ;reset the disk to make sure its okay to use.
     mov ah,0x41 ;Function number for check extentions
     mov bx,0x55aa ;Should be reversed if extentions exist
     mov dl,byte[disk] ;move the BIOs disk into dl
@@ -77,7 +65,27 @@ check_disk_ext:
     jc disk_read_no_ext ;extended disk read is not supported and just use regular CHS values.
      
 disk_read_ext:
-    call disk_reset 
+    mov ah,0x48 ;Extended disk parameters 
+    mov dl,byte[disk] ;move disk no into dl  
+    mov si,disk_struct ;ds:si = buffer
+    mov byte[si],0x42 ;size of version 3.0 buffer
+
+    int 0x13 ;;call interupt and fille disk_struct
+    jnc disk_read_no_ext ;;if somehow this errors read without ext
+    xor dx,dx ;clear edx register 
+
+    mov cx,word[disk_struct+0x18] ;calculate sector count again with extended features.
+
+    mov ax,word[stage2_size] ;size of stage 2 
+    div cx ;divide by cx
+    cmp dx,0x00 ;cmp remainder to zero  
+    je .skip_round ;if dx is zero dkip to 
+
+    inc ax ;if dx is not zero increment sectors to read by one 
+
+    .skip_round:
+    push ax ;save sectors to read count
+    call disk_reset ;reset the disk before read
     pop ax ;sector count to read really only al should have bytes set.
     push dword [stage2_lba+4];push the four higher bytes on to the stack
     push dword [stage2_lba];Push lower bytes on the stack
@@ -87,13 +95,21 @@ disk_read_ext:
     push word 0x0010 ;size of dap 
     
     mov si,sp ;ds:si must point to dap
-    mov dl,byte[disk]
-    mov ah,0x42
+    mov dl,byte[disk] ;disk to read from 
+    mov ah,0x42 ;call read interupts
     
     int 0x13 ;call interupt
 
-    jnc attempt_boot
+    jnc attempt_boot ;if no error happened attempt boot
+    ;If an error happened try again with CHS read (THOUGH this is unlikely to be needed)
 
+;
+; CHS is old and isn't used on any thing even remotely recent if 
+; I need to FREE up space this is the first function to delete
+; CHS just assumes 512 byte sectors 
+; Not ideal but there doesn't seem to be
+; a way to get it without ah=0x48
+;
 disk_read_no_ext:
     call disk_reset ;call reset disk function 
     mov eax,dword[stage2_lba+4] ;mov higher bytes of the LBA into eax 
@@ -102,8 +118,8 @@ disk_read_no_ext:
     ;calculate a 48 bit LBA
 
     ;clear out all the registers we are going to use
-    xor ecx,ecx
-    xor di,di 
+    xor ecx,ecx 
+    xor di,di ;es:di 0000:0000 to guard BIOS bugs
 
     mov ah,0x08 ;get drive parameter interupt no 
     mov dl,[disk] ;disk to get parameters for 
@@ -137,7 +153,19 @@ disk_read_no_ext:
     inc dl ;add one to the sector count 
     or [abs_sec],dl ;store the sector count 
     
-    pop ax
+calculate_sectors:
+    mov ax,word[stage2_size] ;move the size of stage2 into ax 
+    mov cx,512 ;size of disk sector assume 512 
+    xor dx,dx ;clear out remainder register
+
+    div cx ;divide size by 512 
+
+    cmp dx,0x00 ;Check if DX = 0
+    je .skip_rounding ;if remainder not set go straight to reading 
+    
+    inc ax ;if remainder is set increment by one sector
+
+    .skip_rounding:
     mov dl, [disk] ;where we saved the BIOS disk number 
     mov bx, 0x8000 ;load stage 2 in here
     mov dh, [abs_had] ;Partition head number 
@@ -148,26 +176,27 @@ disk_read_no_ext:
     jc read_error ;if carry flag is set jump to read error 
     
 attempt_boot:
-    xor dx,dx 
-    mov dl,byte[disk]
-    mov di,word[0x8018]
-    jmp di
+    xor dx,dx ;xor out dx 
+    mov dl,byte[disk] ;mov disk no into dl 
+    mov di,word[0x8018] ;get elf file entry point
+    jmp di ;jmp to di in memory
 
 
 disk_reset:
-    xor ah,ah
-    mov dl,byte[disk]
-    int 0x13
-    jc disk_reset
-    ret
+    xor ah,ah ;xor out ah for disk reset 
+    mov dl,byte[disk] ;drive to reset 
+    int 0x13 ;call interupt 
+    jc disk_reset ;Jump if carry is set 
+    ret ;return to callee function 
+
 read_error:
-    mov si,disk_error 
+    mov si,disk_error ;pointer to string to print 
     call print_str ;call print string function 
 
 loop_end:
-    cli
-    hlt
-    jmp loop_end
+    cli ;clear interupts 
+    hlt ;halt CPU 
+    jmp loop_end ;jump to loop_end 
 
 %include './stage1/print16.asm'
 
@@ -178,11 +207,11 @@ abs_cyl: db 0x00 ;calculated absolute cyliander
 abs_sec: db 0x00 ;calculated absolute sector 
 disk: db 0x00 ;BIOS Boot Disk 
 abs_had: db 0x00 ;calculated absolute head 
-disk_error: db "Disk Err", 0x00 ;4 
+disk_error: db "Disk Err", 0x00 ;4 i
 ;constants of where the LBA and size of stage2 will be stored
-times 0x190-($-$$) db 0x00
-stage2_lba: dq 1
+times 0x190-($-$$) db 0x00 ;Used to postition these values at an absolute locations 0x190(stage2 LBA) & 0x198(Stage2 Size)
+stage2_lba: dq 1 ;Default to LBA address 1(Sector 2) but fill out correctly at runtime
 stage2_size: dw 0x0010 ;stage 2 is limited to 64K in size
 
-times 510-($-$$) db 0x00
-db 0x55, 0xaa
+times 0x1fe-($-$$) db 0x00 ;pad with zeros to the 512 byte of the boot sector 
+db 0x55, 0xaa ;IBM BIOS Boot number 

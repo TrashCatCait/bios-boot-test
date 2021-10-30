@@ -71,8 +71,6 @@ init_pm:
     mov fs,ax
     mov esp,0x90000
     
-    
-
     push mmap_struc
     push frmbfr
     call cmain
