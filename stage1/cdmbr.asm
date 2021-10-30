@@ -225,6 +225,7 @@ times 0x190-($-$$) db 0x00 ;Used to postition these values at an absolute locati
 stage2_lba: dq 0x01 ;Default to LBA address 1(Sector 2) but fill out correctly at runtime
 stage2_size: dw stage2_end - stage2 ;stage 2 is limited to 64K in size
 
+
 times 2048-($-$$) db 0x00 ;pad with zeros to the 512 byte of the boot sector 
 
 stage2:
