@@ -9,7 +9,6 @@ void cmain(framebuffer_t *framebfr, memptr_t *memory) {
     clear_scr();
     init_idt();
     draw_str8x16("Hello World!", 0, 0);
-    asm("sti");
     while(1){
      
     }
